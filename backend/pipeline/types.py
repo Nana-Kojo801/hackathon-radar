@@ -33,6 +33,8 @@ class RawListing:
     international_ok: bool | None = None
     student_only: bool | None = None
     image_url: str | None = None
+    # Prize breakdown: [{"name", "amount_text", "amount_usd" (per winner), "winners", "perks"}]
+    prizes: list[dict] = field(default_factory=list)
 
 
 class Source:
@@ -43,10 +45,11 @@ class Source:
     def fetch(self) -> list[RawListing]:
         raise NotImplementedError
 
-    def fetch_detail(self, listing: dict) -> str | None:
-        """Optional: return a longer description for a stored listing.
+    def fetch_detail(self, listing: dict) -> dict | None:
+        """Optional: fetch a listing's own page for what the list doesn't carry.
 
-        Called only right before AI enrichment, so detail pages are fetched
-        only for new or changed listings.
+        Returns {"text": long description, "prizes": [...]}. The pipeline's
+        detail step calls it for new or changed listings (and weekly after),
+        before AI enrichment.
         """
         return None

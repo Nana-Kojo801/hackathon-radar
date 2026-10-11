@@ -100,4 +100,25 @@ class DevfolioSource(Source):
             format=fmt,
             categories=map_themes(themes),
             image_url=h.get("cover_img") or settings.get("logo"),
+            prizes=_prizes(d.get("prizeDetails") or []),
         )
+
+
+def _prizes(details: list[dict]) -> list[dict]:
+    """Devfolio prizeDetails: sponsor/track groups, each with prizes {name, amount, currency, quantity}."""
+    out = []
+    for group in details:
+        for p in group.get("prizes") or []:
+            amount = p.get("amount") or 0
+            currency = (p.get("currency") or "USD").upper()
+            name = p.get("name") or group.get("name") or "Prize"
+            if group.get("name") and group["name"].lower() not in name.lower():
+                name = f"{group['name']}: {name}"
+            out.append({
+                "name": name[:120],
+                "amount_text": f"{currency} {amount:,.0f}" if amount else None,
+                "amount_usd": to_usd(amount, currency) if amount else None,
+                "winners": int(p.get("quantity") or 1),
+                "perks": [p["desc"][:160]] if p.get("desc") else [],
+            })
+    return out[:20]

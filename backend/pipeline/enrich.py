@@ -97,7 +97,7 @@ def _user_prompt(row: dict) -> str:
             lines.append(f"Known {k}: {row[k].date().isoformat()}")
     if row.get("hints", {}).get("format"):
         lines.append(f"Known format: {row['hints']['format']}")
-    desc = clean_text(row.get("description_raw"), DESC_LIMIT) or "-"
+    desc = clean_text(row.get("description_detail") or row.get("description_raw"), DESC_LIMIT) or "-"
     lines.append(f"Description:\n{desc}")
     return "\n".join(lines)
 
@@ -117,22 +117,13 @@ def _validated(result: dict) -> dict:
     return out
 
 
-def enrich_one(row: dict, sources: dict[str, Source], usage: ai.Usage) -> tuple[dict, dict | None, str | None]:
-    """Returns (row, ai_result, fetched_description). Raises on AI failure."""
-    detail = None
-    src = sources.get(row["source"])
-    if src and len(row.get("description_raw") or "") < 400:
-        try:
-            detail = src.fetch_detail(row)
-            if detail:
-                row = {**row, "description_raw": detail}
-        except Exception as e:  # detail page is a bonus, never fatal
-            log.info("detail fetch failed for %s: %s", row["source_url"], e)
+def enrich_one(row: dict, usage: ai.Usage) -> dict:
+    """One AI call for one listing. Raises on failure."""
     result = ai.chat_json(SYSTEM, _user_prompt(row), SCHEMA, "hackathon_enrichment", usage)
-    return row, _validated(result), detail
+    return _validated(result)
 
 
-def _apply(cur, row: dict, res: dict, detail: str | None) -> None:
+def _apply(cur, row: dict, res: dict) -> None:
     hints = row.get("hints") or {}
     hint_prize = hints.get("prize_usd")
     hidden = not res["is_real_hackathon"] and row["source"] in DROPPABLE_SOURCES
@@ -152,7 +143,6 @@ def _apply(cur, row: dict, res: dict, detail: str | None) -> None:
             start_date = COALESCE(start_date, %(start)s),
             end_date = COALESCE(end_date, %(end)s),
             registration_deadline = COALESCE(registration_deadline, %(deadline)s),
-            description_raw = COALESCE(%(detail)s, description_raw),
             enriched_hash = content_hash,
             enriched_at = now(),
             enrichment_model = %(model)s,
@@ -176,7 +166,6 @@ def _apply(cur, row: dict, res: dict, detail: str | None) -> None:
             "hidden": hidden,
             "start": res["start_date"], "end": res["end_date"],
             "deadline": res["registration_deadline"],
-            "detail": clean_text(detail, 8000),
             "model": config.OPENAI_MODEL,
         },
     )
@@ -218,12 +207,12 @@ def run_enrichment(conn, sources: dict[str, Source], limit: int | None = None) -
 
     usage = ai.Usage()
     with ThreadPoolExecutor(max_workers=4) as pool:
-        futures = [(r, pool.submit(enrich_one, r, sources, usage)) for r in rows]
+        futures = [(r, pool.submit(enrich_one, r, usage)) for r in rows]
         for row, fut in futures:
             try:
-                new_row, res, detail = fut.result()
+                res = fut.result()
                 with conn.cursor() as cur:
-                    _apply(cur, new_row, res, detail)
+                    _apply(cur, row, res)
                 conn.commit()
                 stats["enriched"] += 1
                 if not res["is_real_hackathon"] and row["source"] in DROPPABLE_SOURCES:

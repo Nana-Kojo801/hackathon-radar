@@ -140,7 +140,8 @@ def list_hackathons(
 def get_hackathon(hackathon_id: UUID) -> dict:
     with db.cursor() as cur:
         cur.execute(
-            f"SELECT {LIST_COLUMNS}, description_raw, dates_text, enriched_at, enrichment_model"
+            f"SELECT {LIST_COLUMNS}, COALESCE(description_detail, description_raw) AS description,"
+            " prizes, dates_text, enriched_at, enrichment_model"
             " FROM hackathons WHERE id = %s",
             (hackathon_id,),
         )

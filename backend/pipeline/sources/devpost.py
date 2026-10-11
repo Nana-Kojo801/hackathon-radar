@@ -97,16 +97,43 @@ class DevpostSource(Source):
             image_url=("https:" + thumb) if thumb.startswith("//") else (thumb or None),
         )
 
-    def fetch_detail(self, listing: dict) -> str | None:
+    def fetch_detail(self, listing: dict) -> dict | None:
         r = self.client.get(listing["source_url"])
         soup = BeautifulSoup(r.text, "lxml")
         parts = []
         meta = soup.find("meta", attrs={"name": "description"})
         if meta and meta.get("content"):
             parts.append(meta["content"].strip())
-        for sel in ("#challenge-information", "#challenge-description", "#prizes"):
+        for sel in ("#challenge-information", "#challenge-description"):
             el = soup.select_one(sel)
             if el:
                 parts.append(el.get_text(" ", strip=True))
-        text = "\n\n".join(parts)
-        return text or None
+        return {"text": "\n\n".join(parts) or None, "prizes": parse_prizes(soup)}
+
+
+def parse_prizes(soup: BeautifulSoup) -> list[dict]:
+    """Devpost prize cards: title, '<cur><amount> in cash' per winner, 'N winners', perks."""
+    out = []
+    for card in soup.select("#prizes .prize")[:20]:
+        title = card.select_one(".prize-title")
+        name = title.get_text(" ", strip=True) if title else ""
+        if not name:
+            continue
+        value = card.select_one(".prize-value")
+        value_text = value.get_text(" ", strip=True) if value else ""
+        amount_text = None
+        if "in cash" in value_text:
+            amount_text = re.sub(r"\s+", "", value_text.split("in cash")[0]) or None
+        amount, currency = parse_money(amount_text)
+        winners_el = card.select_one(".prize-winners")
+        m = re.search(r"(\d+)", winners_el.get_text() if winners_el else "")
+        perks_el = card.find("p")
+        perks = [p.strip(" •") for p in perks_el.get_text("\n", strip=True).split("\n") if p.strip(" •")] if perks_el else []
+        out.append({
+            "name": name[:120],
+            "amount_text": amount_text,
+            "amount_usd": to_usd(amount, currency),
+            "winners": int(m.group(1)) if m else 1,
+            "perks": perks[:4],
+        })
+    return out

@@ -52,3 +52,27 @@ def test_mlh_season():
     assert current_seasons(d(2026, 10, 11)) == [2027]
     assert current_seasons(d(2027, 2, 1)) == [2027]
     assert current_seasons(d(2027, 6, 1)) == [2027, 2028]
+
+
+def test_devpost_prize_parsing():
+    from bs4 import BeautifulSoup
+
+    from pipeline.sources.devpost import parse_prizes
+
+    html = """<div id="prizes">
+      <div class="prize"><h6><div class="prize-title"><span></span><div>Grand Prize</div></div></h6>
+        <div class="prize-content"><div class="prize-value"><span data-currency="true">€
+        <span data-currency-value>10,000</span></span> in cash</div>
+        <div class="prize-winners">1 winner</div><p>• Mentoring<br>• Swag</p></div></div>
+      <div class="prize"><h6><div class="prize-title"><div>Company Challenge</div></div></h6>
+        <div class="prize-content"><div class="prize-value"><span>$<span>2,000</span></span> in cash</div>
+        <div class="prize-winners">15 winners</div><p></p></div></div>
+      <div class="prize"><h6><div class="prize-title"><div>Best Design</div></div></h6>
+        <div class="prize-content"><div class="prize-winners">1 winner</div><p>• Hardware kit</p></div></div>
+    </div>"""
+    prizes = parse_prizes(BeautifulSoup(html, "lxml"))
+    assert [p["name"] for p in prizes] == ["Grand Prize", "Company Challenge", "Best Design"]
+    assert prizes[0]["amount_text"] == "€10,000" and prizes[0]["amount_usd"] == 10800
+    assert prizes[0]["perks"] == ["Mentoring", "Swag"]
+    assert prizes[1]["winners"] == 15 and prizes[1]["amount_usd"] == 2000
+    assert prizes[2]["amount_text"] is None and prizes[2]["perks"] == ["Hardware kit"]

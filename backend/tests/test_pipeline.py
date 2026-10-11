@@ -168,3 +168,35 @@ def test_unvetted_web_finds_are_hidden_from_the_list(conn, monkeypatch):
     db.pool().close()
     monkeypatch.setattr(db, "_pool", None)
     assert config.DATABASE_URL == os.environ["TEST_DATABASE_URL"]
+
+
+def test_details_step_stores_description_and_prizes_without_overwrite(conn):
+    from pipeline.details import run_details
+    from pipeline.run import run_source
+    from pipeline.store import refresh_statuses
+    from pipeline.types import Source
+
+    class Detailed(Source):
+        name = "devpost"
+        calls = 0
+
+        def fetch_detail(self, row):
+            Detailed.calls += 1
+            return {"text": "A long description " * 30,
+                    "prizes": [{"name": "1st", "amount_text": "$3,000", "amount_usd": 3000, "winners": 1, "perks": []}]}
+
+    listing = _listing(start_date=None, end_date=None, description="Themes: AI.")
+    run_source(conn, Good([listing]))
+    with conn.cursor() as cur:
+        refresh_statuses(cur)
+    conn.commit()
+    assert run_details(conn, {"devpost": Detailed()})["fetched"] == 1
+    assert run_details(conn, {"devpost": Detailed()})["candidates"] == 0  # fresh, not refetched
+    run_source(conn, Good([_listing(start_date=None, end_date=None, description="Themes: AI.")]))  # same listing again
+    with conn.cursor() as cur:
+        cur.execute("SELECT description_raw, description_detail, prizes FROM hackathons")
+        row = cur.fetchone()
+    assert row["description_raw"] == "Themes: AI."
+    assert row["description_detail"].startswith("A long description")
+    assert row["prizes"][0]["amount_usd"] == 3000
+    assert Detailed.calls == 1

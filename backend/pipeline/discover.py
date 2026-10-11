@@ -97,7 +97,8 @@ Return every SPECIFIC hackathon on the page that people can still register for o
 registration page; use links shown in [brackets] in the text. If the page itself is one
 hackathon's page, return it with the page URL. Skip: generic advice, courses, job posts,
 past events, hackathon platforms' home pages, and anything without a link.
-Don't invent facts: use null when the page doesn't say. Return {"hackathons": []} if none."""
+Don't invent facts or URLs: use null when the page doesn't say, and only use URLs that appear
+on the page. Return at most 15 hackathons. Return {"hackathons": []} if none."""
 
 
 def search(query: str, client: httpx.Client) -> list[dict]:
@@ -225,7 +226,7 @@ class WebDiscoverySource(Source):
                         today = datetime.now(timezone.utc).date().isoformat()
                         out = ai.chat_json(
                             EXTRACT_SYSTEM, f"Today: {today}\nPage URL: {res['url']}\n\n{text}",
-                            EXTRACT_SCHEMA, "hackathon_extraction", usage, max_tokens=2500,
+                            EXTRACT_SCHEMA, "hackathon_extraction", usage, max_tokens=4000,
                         )
                         items = out.get("hackathons") or []
                         with conn.cursor() as cur:

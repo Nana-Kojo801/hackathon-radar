@@ -13,7 +13,7 @@ from concurrent.futures import TimeoutError as FutureTimeout
 
 from app import db
 
-from . import enrich, store
+from . import details, enrich, store
 from .normalize import normalize
 from .sources import all_sources
 from .types import Source
@@ -108,6 +108,8 @@ def run_pipeline(only: list[str] | None = None, do_enrich: bool = True) -> dict:
         with conn.cursor() as cur:
             store.refresh_statuses(cur)
         conn.commit()
+
+        summary["details"] = details.run_details(conn, {s.name: s for s in available})
 
         if do_enrich:
             summary["enrich"] = enrich.run_enrichment(conn, {s.name: s for s in available})
