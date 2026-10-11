@@ -1,4 +1,6 @@
-# Hackathon Radar
+# Hackscout
+
+*Formerly "Hackathon Radar": renamed because another platform already uses that name. Deploy names (the Render service, the `hackathon-radar` Worker and repo) keep the old name, since renaming them would change live URLs.*
 
 A personal hackathon finder. It pulls hackathons from Devpost, Devfolio, MLH, TAIKAI, ETHGlobal, Unstop and the open web, runs a cheap AI pass over each one, and shows them in a single list sorted by prize money. Each card links out to the original page so you can register there.
 

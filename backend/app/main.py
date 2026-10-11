@@ -13,7 +13,7 @@ from .categories import CATEGORIES, STATUSES, VETTED_SOURCES
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("api")
 
-app = FastAPI(title="Hackathon Radar API", version="1.0")
+app = FastAPI(title="Hackscout API", version="1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.ALLOWED_ORIGINS,

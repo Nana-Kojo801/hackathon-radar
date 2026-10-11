@@ -4,13 +4,14 @@ import type { ReactNode } from "react";
 import { navigate } from "../lib/router";
 import { cn } from "../lib/utils";
 
+/** Hackscout's mark: a compass, its needle's north half in orange. */
 export function Logo({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" className={cn("h-8 w-8 wide:h-9 wide:w-9", className)} aria-hidden="true">
-      <circle cx="15" cy="17" r="12" fill="none" stroke="#0D869D" strokeWidth="2.6" />
-      <circle cx="15" cy="17" r="6.5" fill="none" stroke="#0D869D" strokeWidth="2.6" />
-      <path d="M15 17 L27 5" stroke="#F04A23" strokeWidth="2.6" strokeLinecap="round" />
-      <path d="M21.5 4.5 L27.5 4.5 L27.5 10.5" fill="none" stroke="#F04A23" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 48 48" className={cn("h-8 w-8 wide:h-9 wide:w-9", className)} aria-hidden="true">
+      <circle cx="24" cy="24" r="19" fill="none" stroke="#017c91" strokeWidth="3.5" />
+      <path d="M24 7.5 L30 24 L18 24 Z" fill="#f97316" />
+      <path d="M18 24 L30 24 L24 40.5 Z" fill="#017c91" />
+      <circle cx="24" cy="24" r="2.2" fill="#ffffff" />
     </svg>
   );
 }
@@ -24,10 +25,10 @@ export function BrandLink() {
         navigate("/");
       }}
       className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-teal/40"
-      aria-label="Hackathon Radar, all hackathons"
+      aria-label="Hackscout, all hackathons"
     >
       <Logo />
-      <span className="text-[19px] font-semibold wide:text-[21px] tracking-[-0.01em] text-ink">Hackathon Radar</span>
+      <span className="text-[19px] font-semibold wide:text-[21px] tracking-[-0.01em] text-ink">Hackscout</span>
     </a>
   );
 }

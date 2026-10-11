@@ -58,8 +58,8 @@ def build(out: Path) -> dict:
     # Serve files as-is (no Jekyll processing on GitHub Pages).
     (out / ".nojekyll").write_text("")
     (out / "index.html").write_text(
-        "<!doctype html><meta charset=utf-8><title>Hackathon Radar data</title>"
-        "<p>Data files for <a href='https://hackathon-radar.nkabenyah.workers.dev/'>Hackathon Radar</a>.</p>"
+        "<!doctype html><meta charset=utf-8><title>Hackscout data</title>"
+        "<p>Data files for <a href='https://hackathon-radar.nkabenyah.workers.dev/'>Hackscout</a>.</p>"
     )
     return {"hackathons": len(items)}
 
