@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, List, ListFilter, ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, List, ListFilter, TriangleAlert, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { SearchField, TopBar } from "../components/Brand";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
+import { ChipMultiSelect, FieldMultiSelect } from "../components/ui/multi-select";
 import { FieldSelect, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Sheet } from "../components/ui/sheet";
 import type { Hackathon } from "../lib/api";
@@ -24,6 +25,7 @@ import {
   deadlineLabel,
   eligibilityLabel,
   FORMAT_LABEL,
+  isNew,
   mainCategory,
   prizeText,
   sourceName,
@@ -43,8 +45,10 @@ interface Props {
   onRetry: () => void;
   filters: Filters;
   setFilters: (f: Filters) => void;
-  categories: string[];
+  categories: { category: string; count: number }[];
   lastRefresh: string | null;
+  firstRunAt: string | null;
+  warning: { key: string; text: string } | null;
   page: number;
   setPage: (p: number) => void;
   highlightId?: string | null;
@@ -67,12 +71,12 @@ export function Discovery(p: Props) {
     if (k !== "view") p.setPage(1);
   };
   const categoryOptions = useMemo(
-    () => [{ value: "all", label: "All categories" }, ...p.categories.map((c) => ({ value: c, label: categoryLabel(c) }))],
+    () => p.categories.map((c) => ({ value: c.category, label: categoryLabel(c.category), count: c.count })),
     [p.categories],
   );
   const filterCount = activeFilterCount(f);
   const showing = p.items.length ? `${start + 1}–${start + rows.length}` : "0";
-  const listKey = `${page}|${f.sort}|${f.format}|${f.international}|${f.student}|${f.category}|${f.minPrize}|${f.q}`;
+  const listKey = `${page}|${f.sort}|${f.format}|${f.international}|${f.student}|${f.categories.join(",")}|${f.minPrize}|${f.q}`;
 
   useEffect(() => {
     if (p.page > pages) p.setPage(pages);
@@ -89,7 +93,11 @@ export function Discovery(p: Props) {
       <FieldSelect label="Format" value={f.format} onChange={(v) => set("format", v)} options={FORMAT_OPTIONS} className={stack ? "" : "w-[138px]"} triggerClassName={stack ? "w-full" : "w-full"} />
       <FieldSelect label="International" value={f.international} onChange={(v) => set("international", v)} options={INTERNATIONAL_OPTIONS} className={stack ? "" : "w-[94px]"} triggerClassName="w-full" />
       <FieldSelect label="Student-only" value={f.student} onChange={(v) => set("student", v)} options={STUDENT_OPTIONS} className={stack ? "" : "w-[166px]"} triggerClassName="w-full" />
-      <FieldSelect label="Category" value={f.category} onChange={(v) => set("category", v)} options={categoryOptions} className={stack ? "" : "w-[160px]"} triggerClassName="w-full" />
+      {stack ? (
+        <ChipMultiSelect label="Category" value={f.categories} onChange={(v) => set("categories", v)} options={categoryOptions} />
+      ) : (
+        <FieldMultiSelect label="Category" allLabel="All categories" value={f.categories} onChange={(v) => set("categories", v)} options={categoryOptions} className="w-[160px]" />
+      )}
       <FieldSelect label="Minimum prize" value={f.minPrize} onChange={(v) => set("minPrize", v)} options={PRIZE_OPTIONS} className={stack ? "" : "w-[118px]"} triggerClassName="w-full" />
     </>
   );
@@ -137,6 +145,7 @@ export function Discovery(p: Props) {
   return (
     <div>
       <TopBar />
+      <HealthBanner warning={p.warning} />
 
       {/* Title + search */}
       <section className="flex flex-col gap-4 px-5 pt-5 pb-4 wide:flex-row wide:items-start wide:justify-between wide:gap-10 wide:px-7 wide:pt-7 wide:pb-6">
@@ -238,12 +247,12 @@ export function Discovery(p: Props) {
           </Button>
         </motion.div>
       ) : f.view === "table" ? (
-        <TableView rows={rows} listKey={listKey} highlightId={p.highlightId} />
+        <TableView rows={rows} listKey={listKey} highlightId={p.highlightId} firstRunAt={p.firstRunAt} />
       ) : (
         <ul key={listKey}>
           <AnimatePresence initial={true}>
             {rows.map((h, i) => (
-              <Row key={h.id} h={h} index={i} highlight={h.id === p.highlightId} />
+              <Row key={h.id} h={h} index={i} highlight={h.id === p.highlightId} isNew={isNew(h, p.firstRunAt)} />
             ))}
           </AnimatePresence>
         </ul>
@@ -291,7 +300,7 @@ function Pills({ h, compact }: { h: Hackathon; compact?: boolean }) {
   );
 }
 
-function Row({ h, index, highlight }: { h: Hackathon; index: number; highlight: boolean }) {
+function Row({ h, index, highlight, isNew }: { h: Hackathon; index: number; highlight: boolean; isNew: boolean }) {
   const deadline = deadlineLabel(h);
   const dates = dateRange(h.start_date, h.end_date);
   const summary = h.summary;
@@ -316,6 +325,7 @@ function Row({ h, index, highlight }: { h: Hackathon; index: number; highlight: 
           <div className="flex items-start justify-between gap-3">
             <h2 className="text-[18px] leading-snug font-bold tracking-[-0.01em] text-ink transition-colors duration-200 group-hover:text-teal wide:text-[31px] wide:leading-tight">
               {h.title}
+              {isNew && <NewBadge className="ml-2 -translate-y-px wide:ml-3 wide:-translate-y-1" />}
             </h2>
             <span className="shrink-0 text-[17px] font-bold whitespace-nowrap text-ink wide:hidden">{prizeText(h)}</span>
           </div>
@@ -333,7 +343,7 @@ function Row({ h, index, highlight }: { h: Hackathon; index: number; highlight: 
             {deadline && (
               <>
                 <span aria-hidden="true">•</span>
-                <Badge tone={deadline.tone} className="rounded-full px-3.5">
+                <Badge tone={deadline.tone} className="rounded-full px-3.5" title={deadline.full ?? undefined}>
                   {deadline.text}
                 </Badge>
               </>
@@ -366,7 +376,17 @@ function Row({ h, index, highlight }: { h: Hackathon; index: number; highlight: 
   );
 }
 
-function TableView({ rows, listKey, highlightId }: { rows: Hackathon[]; listKey: string; highlightId?: string | null }) {
+function TableView({
+  rows,
+  listKey,
+  highlightId,
+  firstRunAt,
+}: {
+  rows: Hackathon[];
+  listKey: string;
+  highlightId?: string | null;
+  firstRunAt: string | null;
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[860px] text-left text-[15px]">
@@ -395,24 +415,27 @@ function TableView({ rows, listKey, highlightId }: { rows: Hackathon[]; listKey:
                 className={cn("group cursor-pointer border-b border-line transition-colors hover:bg-[#f7fbfd]", h.id === highlightId && "row-flash")}
               >
                 <td className="max-w-[340px] py-3.5 pr-4 pl-7">
-                  <a
-                    href={`/h/${h.id}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      open(h.id);
-                    }}
-                    className="block truncate font-bold text-ink group-hover:text-teal"
-                  >
-                    {h.title}
-                  </a>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <a
+                      href={`/h/${h.id}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        open(h.id);
+                      }}
+                      className="min-w-0 truncate font-bold text-ink group-hover:text-teal"
+                    >
+                      {h.title}
+                    </a>
+                    {isNew(h, firstRunAt) && <NewBadge className="shrink-0" />}
+                  </div>
                   <span className="block truncate text-[13.5px] text-periwinkle">{h.organizer ?? sourceName(h)}</span>
                 </td>
                 <td className="px-4 py-3.5 text-right font-bold whitespace-nowrap text-ink">{prizeText(h)}</td>
                 <td className="px-4 py-3.5 whitespace-nowrap">
                   {deadline ? (
-                    <Badge tone={deadline.tone} size="sm" className="rounded-full">
-                      {deadline.text.replace(/^(Closes|Closed|Starts) /, "")}
+                    <Badge tone={deadline.tone} size="sm" className="rounded-full" title={deadline.full ?? undefined}>
+                      {capitalize(deadline.text.replace(/^(Closes|Closed|Starts) /, ""))}
                     </Badge>
                   ) : (
                     <span className="text-body">TBA</span>
@@ -436,6 +459,71 @@ function TableView({ rows, listKey, highlightId }: { rows: Hackathon[]; listKey:
         </tbody>
       </table>
     </div>
+  );
+}
+
+function capitalize(t: string): string {
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function NewBadge({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-[20px] items-center rounded-[6px] bg-[#fff1e6] px-1.5 align-middle text-[11px] font-bold tracking-[0.06em] text-[#c2410c] wide:h-[22px] wide:px-2 wide:text-[12px]",
+        className,
+      )}
+      title="First seen in the last 48 hours"
+    >
+      NEW
+    </span>
+  );
+}
+
+const DISMISSED = "hackathon-radar:dismissed-warning";
+
+/** Shown when a source failed on the last run or refreshes stopped. Dismissing hides it until the problem changes. */
+function HealthBanner({ warning }: { warning: { key: string; text: string } | null }) {
+  const [dismissed, setDismissed] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem(DISMISSED);
+    } catch {
+      return null;
+    }
+  });
+  const show = !!warning && warning.key !== dismissed;
+  return (
+    <AnimatePresence initial={false}>
+      {show && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          className="overflow-hidden"
+        >
+          <div role="status" className="mx-5 mt-4 flex items-start gap-3 rounded-[12px] border border-[#fed7aa] bg-[#fff7ed] px-4 py-3 wide:mx-7">
+            <TriangleAlert className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#ea580c]" strokeWidth={2.2} />
+            <p className="flex-1 text-[14.5px] leading-snug text-[#7c2d12]">{warning.text}</p>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => {
+                setDismissed(warning.key);
+                try {
+                  sessionStorage.setItem(DISMISSED, warning.key);
+                } catch {
+                  /* ignore */
+                }
+              }}
+              className="-m-1 rounded-md p-1 text-[#9a3412] hover:bg-[#ffedd5]"
+            >
+              <X className="h-4 w-4" strokeWidth={2.2} />
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

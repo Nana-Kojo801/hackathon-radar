@@ -92,14 +92,42 @@ export function durationDays(start: string | null, end: string | null): string |
   return `${d} ${d === 1 ? "day" : "days"}`;
 }
 
-/** The card's deadline pill: "Closes Oct 24, 2026", or "Starts …" when only a start is known. */
-export function deadlineLabel(h: Hackathon): { text: string; tone: "red" | "grey" } | null {
-  if (h.registration_deadline) {
-    const past = Date.parse(h.registration_deadline) < Date.now();
-    return { text: `${past ? "Closed" : "Closes"} ${fullDate(h.registration_deadline)}`, tone: past ? "grey" : "red" };
+/** Whole days until the registration deadline (0 = today), negative once passed, null if none. */
+export function daysLeft(h: Pick<Hackathon, "registration_deadline">, now = Date.now()): number | null {
+  if (!h.registration_deadline) return null;
+  const ms = Date.parse(h.registration_deadline) - now;
+  if (Number.isNaN(ms)) return null;
+  return ms < 0 ? -1 : Math.floor(ms / DAY);
+}
+
+/** "Closes today", "Closes tomorrow", "Closes in N days". */
+export function closesText(days: number): string {
+  if (days === 0) return "Closes today";
+  if (days === 1) return "Closes tomorrow";
+  return `Closes in ${days} days`;
+}
+
+/**
+ * The card's deadline pill: a countdown for the next month ("Closes in 12 days"),
+ * the date after that, or "Starts …" when only a start date is known.
+ * `full` is the exact deadline, for the tooltip.
+ */
+export function deadlineLabel(h: Hackathon): { text: string; tone: "red" | "grey"; full: string | null } | null {
+  const days = daysLeft(h);
+  if (days !== null) {
+    const full = `${fullDate(h.registration_deadline)}, ${timeUtc(h.registration_deadline)}`;
+    if (days < 0) return { text: `Closed ${fullDate(h.registration_deadline)}`, tone: "grey", full };
+    return { text: days <= 30 ? closesText(days) : `Closes ${fullDate(h.registration_deadline)}`, tone: "red", full: `Registration closes ${full}` };
   }
-  if (h.start_date) return { text: `Starts ${fullDate(h.start_date)}`, tone: "grey" };
+  if (h.start_date) return { text: `Starts ${fullDate(h.start_date)}`, tone: "grey", full: null };
   return null;
+}
+
+/** First seen in the last 48 hours. Listings from the very first refresh don't count: everything was new then. */
+export function isNew(h: Hackathon, firstRunAt: string | null, now = Date.now()): boolean {
+  const seen = Date.parse(h.first_seen_at);
+  if (now - seen > 2 * DAY) return false;
+  return !(firstRunAt && seen - Date.parse(firstRunAt) < 3_600_000);
 }
 
 export function eligibilityLabel(h: Hackathon): { text: string; tone: "green" | "grey" } {

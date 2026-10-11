@@ -9,6 +9,8 @@ import { fetchJSON, type Hackathon, type HackathonDetail } from "../lib/api";
 import {
   categoryLabel,
   cleanText,
+  closesText,
+  daysLeft,
   dateRange,
   durationDays,
   eligibilityLabel,
@@ -122,13 +124,10 @@ function StatusBadge({ h }: { h: Hackathon }) {
 
 /** "Closes in 12 days" for the summary card; nothing when there's no deadline. */
 function closesIn(h: Hackathon): { text: string; tone: "red" | "sky" | "grey" } | null {
-  if (!h.registration_deadline) return null;
-  const ms = Date.parse(h.registration_deadline) - Date.now();
-  if (Number.isNaN(ms)) return null;
-  if (ms < 0) return { text: "Registration closed", tone: "grey" };
-  const days = Math.floor(ms / 86_400_000);
-  if (days === 0) return { text: "Closes today", tone: "red" };
-  return { text: `Closes in ${days} ${days === 1 ? "day" : "days"}`, tone: days <= 7 ? "red" : "sky" };
+  const days = daysLeft(h);
+  if (days === null) return null;
+  if (days < 0) return { text: "Registration closed", tone: "grey" };
+  return { text: closesText(days), tone: days <= 7 ? "red" : "sky" };
 }
 
 function statusNote(h: Hackathon): string {

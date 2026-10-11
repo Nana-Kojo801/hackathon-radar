@@ -1,6 +1,6 @@
 import type { Format, Hackathon } from "./api";
 
-export type Sort = "prize" | "deadline" | "new";
+export type Sort = "prize" | "deadline" | "new" | "relevance";
 export type International = "any" | "international" | "not-restricted";
 export type Student = "any" | "hide" | "only";
 export type View = "cards" | "table";
@@ -10,7 +10,8 @@ export interface Filters {
   format: Format | "all";
   international: International;
   student: Student;
-  category: string;
+  /** Any of these (empty = all). */
+  categories: string[];
   minPrize: string;
   sort: Sort;
   view: View;
@@ -21,7 +22,7 @@ export const DEFAULT_FILTERS: Filters = {
   format: "all",
   international: "any",
   student: "any",
-  category: "all",
+  categories: [],
   minPrize: "0",
   sort: "prize",
   view: "cards",
@@ -54,6 +55,7 @@ export const SORT_OPTIONS: { value: Sort; label: string }[] = [
   { value: "prize", label: "Prize" },
   { value: "deadline", label: "Deadline" },
   { value: "new", label: "Newest" },
+  { value: "relevance", label: "Relevance" },
 ];
 
 const KEY = "hackathon-radar:filters:v3";
@@ -61,7 +63,16 @@ const KEY = "hackathon-radar:filters:v3";
 export function loadFilters(): Filters {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...DEFAULT_FILTERS, ...JSON.parse(raw), q: "" };
+    if (raw) {
+      const saved = JSON.parse(raw);
+      // Older saves kept a single category.
+      if (typeof saved.category === "string") {
+        if (!Array.isArray(saved.categories)) saved.categories = saved.category === "all" ? [] : [saved.category];
+        delete saved.category;
+      }
+      if (!Array.isArray(saved.categories)) saved.categories = [];
+      return { ...DEFAULT_FILTERS, ...saved, q: "" };
+    }
   } catch {
     /* storage unavailable */
   }
@@ -77,7 +88,7 @@ export function saveFilters(f: Filters): void {
 }
 
 export function activeFilterCount(f: Filters): number {
-  return [f.format !== "all", f.international !== "any", f.student !== "any", f.category !== "all", f.minPrize !== "0"].filter(Boolean)
+  return [f.format !== "all", f.international !== "any", f.student !== "any", f.categories.length > 0, f.minPrize !== "0"].filter(Boolean)
     .length;
 }
 
@@ -91,7 +102,7 @@ export function applyFilters(items: Hackathon[], f: Filters): Hackathon[] {
     if (f.international === "not-restricted" && h.international_ok === false) return false;
     if (f.student === "hide" && h.student_only === true) return false;
     if (f.student === "only" && h.student_only !== true) return false;
-    if (f.category !== "all" && !h.categories.includes(f.category)) return false;
+    if (f.categories.length && !f.categories.some((c) => h.categories.includes(c))) return false;
     if (min > 0 && !((h.prize_usd ?? 0) >= min)) return false;
     if (q) {
       const hay = `${h.title} ${h.organizer ?? ""} ${h.summary ?? ""} ${h.location_text ?? ""} ${h.categories.join(" ")}`;
@@ -105,6 +116,8 @@ export function applyFilters(items: Hackathon[], f: Filters): Hackathon[] {
   };
   if (f.sort === "prize") out.sort((a, b) => (b.prize_usd ?? -1) - (a.prize_usd ?? -1) || deadline(a) - deadline(b));
   else if (f.sort === "deadline") out.sort((a, b) => deadline(a) - deadline(b) || (b.prize_usd ?? -1) - (a.prize_usd ?? -1));
+  else if (f.sort === "relevance")
+    out.sort((a, b) => (b.relevance_score ?? -1) - (a.relevance_score ?? -1) || (b.prize_usd ?? -1) - (a.prize_usd ?? -1));
   else out.sort((a, b) => Date.parse(b.first_seen_at) - Date.parse(a.first_seen_at));
   return out;
 }

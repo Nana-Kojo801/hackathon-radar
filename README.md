@@ -122,7 +122,7 @@ A Postgres advisory lock stops two refreshes from running at once.
 
 The UI follows the "Atlantic" design: a light theme with two pages.
 
-- **Explore hackathons (`/`):** search, filters (format, international, student-only, category, minimum prize), sort, a cards/table switch, and pages of 10. On a phone the filters open in a bottom sheet.
+- **Explore hackathons (`/`):** search, filters (format, international, student-only, one or more categories, minimum prize), sort (prize, deadline, newest, relevance), a cards/table switch, and pages of 10. On a phone the filters open in a bottom sheet. Cards show a countdown to the registration deadline for the coming month ("Closes in 12 days") and a **NEW** badge on hackathons first seen in the last 48 hours.
 - **Hackathon details (`/h/<id>`):** the key facts strip, tabs that follow your scroll (Overview, Eligibility, Key dates, Prize details, Source), the prize breakdown, and a Register button. The button sits in a sidebar on desktop and is pinned to the bottom on a phone.
 
 How it behaves:
@@ -142,7 +142,7 @@ How it behaves:
 
 ## Checking source health
 
-Look at `GET /meta` → `sources`, or query the `source_runs` table. Each source has one row per run with `fetched`, `new`, `errors`, `error_text` and `tokens_used`. The `enrich` row holds the AI token count for the run, and the `pipeline` row holds the run totals. The frontend shows a small warning banner whenever the last run had a failing source.
+Look at `GET /meta` → `sources`, or query the `source_runs` table. Each source has one row per run with `fetched`, `new`, `errors`, `error_text` and `tokens_used`. The `enrich` row holds the AI token count for the run, and the `pipeline` row holds the run totals. The list page shows a warning banner when a source failed on its last run, or when no refresh has finished in 13 hours (two missed runs). Dismissing it hides it until the problem changes.
 
 ## Cost
 

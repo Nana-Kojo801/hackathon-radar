@@ -2,6 +2,7 @@ import { MotionConfig, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { fetchJSON, type Hackathon, type Meta } from "./lib/api";
+import { healthWarning } from "./lib/health";
 import { applyFilters, type Filters, loadFilters, saveFilters } from "./lib/filters";
 import { detailId, navigate, usePath } from "./lib/router";
 import { Details } from "./pages/Details";
@@ -61,7 +62,7 @@ export default function App() {
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
     items.forEach((h) => h.categories.forEach((c) => counts.set(c, (counts.get(c) ?? 0) + 1)));
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([category, count]) => ({ category, count }));
   }, [items]);
 
   // Page transitions run in two steps so the two pages are never on screen
@@ -132,6 +133,7 @@ export default function App() {
   );
 
   const lastRefresh = meta?.last_refresh ?? null;
+  const warning = useMemo(() => healthWarning(meta), [meta]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -149,6 +151,8 @@ export default function App() {
               setFilters={setFilters}
               categories={categories}
               lastRefresh={lastRefresh}
+              firstRunAt={meta?.first_run_at ?? null}
+              warning={warning}
               page={page}
               setPage={setPage}
               highlightId={highlight}

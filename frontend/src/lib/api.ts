@@ -45,11 +45,23 @@ export interface HackathonDetail extends Hackathon {
   dates_text: string | null;
 }
 
+export interface SourceRun {
+  source: string;
+  started_at: string;
+  finished_at: string | null;
+  fetched: number;
+  new: number;
+  errors: number;
+  error_text: string | null;
+  healthy: boolean;
+}
+
 export interface Meta {
   categories: { category: string; count: number }[];
   active_count: number;
   last_refresh: string | null;
   first_run_at: string | null;
+  sources: SourceRun[];
 }
 
 /**
