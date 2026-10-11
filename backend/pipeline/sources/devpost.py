@@ -100,15 +100,30 @@ class DevpostSource(Source):
     def fetch_detail(self, listing: dict) -> dict | None:
         r = self.client.get(listing["source_url"])
         soup = BeautifulSoup(r.text, "lxml")
-        parts = []
-        meta = soup.find("meta", attrs={"name": "description"})
-        if meta and meta.get("content"):
-            parts.append(meta["content"].strip())
-        for sel in ("#challenge-information", "#challenge-description"):
-            el = soup.select_one(sel)
-            if el:
-                parts.append(el.get_text(" ", strip=True))
-        return {"text": "\n\n".join(parts) or None, "prizes": parse_prizes(soup)}
+        # Only the organizer's write-up: #challenge-information is the sidebar
+        # (deadline, calendar links, participant count) and reads as noise.
+        text = None
+        desc = soup.select_one("#challenge-description")
+        if desc:
+            text = paragraphs(desc)
+        if not text:
+            meta = soup.find("meta", attrs={"name": "description"})
+            if meta and meta.get("content"):
+                text = meta["content"].strip()
+        return {"text": text or None, "prizes": parse_prizes(soup)}
+
+
+def paragraphs(el) -> str:
+    """Block-level text joined by blank lines, so the page can keep paragraphs."""
+    blocks = el.find_all(["p", "li", "h1", "h2", "h3", "h4", "h5", "h6"])
+    out = []
+    for b in blocks:
+        if b.find(["p", "li"]):  # a wrapper; its children are listed separately
+            continue
+        t = re.sub(r"\s+", " ", b.get_text(" ", strip=True))
+        if t:
+            out.append(("• " if b.name == "li" else "") + t)
+    return "\n\n".join(out) if out else el.get_text(" ", strip=True)
 
 
 def parse_prizes(soup: BeautifulSoup) -> list[dict]:

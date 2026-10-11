@@ -98,9 +98,12 @@ A small static FX table (`normalize.FX_TO_USD`) converts INR/EUR/CAD/etc. right 
 - **Devpost prizes:** each prize card lists an amount *per winner* plus a winner count. Both are stored, so the parts add up to the stated pool (e.g. 15 winners × €2,000).
 - **Devfolio prizes:** these come from `prizeDetails` on the microsite the adapter already reads.
 
-## Frontend (design H)
+## Frontend (Atlantic design)
 
-- **Animation:** Framer Motion handles springs, layout reflow when sorting or filtering, the gliding selection outline, the bottom sheet and the page push. Ring fills are pure CSS: an animatable `--p` custom property drives a `conic-gradient`.
-- **Routing:** a ~30-line router in `lib/router.ts`, with no react-router. The app has only two routes.
-- **Data:** the list loads once (about 200 rows) and is filtered in the browser, so filtering is instant. The detail endpoint is fetched when a hackathon opens, while the list data already shows the header.
-- **Responsiveness:** phone and desktop are separate layouts, not a scaled-down desktop. On a phone the detail page slides over the list, so returning keeps your scroll position. On desktop it's a split view.
+- **Design:** built one-to-one from the Atlantic comps (Discovery and Hackathon Details, desktop and phone). Colors and the 900px desktop breakpoint live as Tailwind v4 `@theme` tokens in `index.css`; the font is Figtree.
+- **Components:** shadcn-style Button, Badge, Select and Sheet on Radix primitives, restyled to the comps rather than shadcn's defaults.
+- **Animation:** Framer Motion for the page transition, staggered list rows, the sliding Cards/Table toggle, the tab underline, section reveals and the expanding description. Radix popovers and the sheet use CSS keyframes.
+- **Routing:** a ~30-line router in `lib/router.ts`, with no react-router. The list stays mounted under the detail page so its scroll position and filters survive a round trip.
+- **Data:** the list loads once (about 200 rows) and is filtered and paged in the browser. The detail endpoint is fetched when a hackathon opens, while the list data already fills the header.
+- **Cloudflare:** `wrangler.jsonc` was removed; the Worker created in the dashboard already serves `index.html` for unknown paths.
+- **Devpost descriptions:** only `#challenge-description` is kept, split into paragraphs. The sidebar block (`#challenge-information`) added calendar links and counts. Migration 004 makes the details step refetch Devpost pages once; AI enrichment is keyed on `content_hash`, so this costs no OpenAI tokens.

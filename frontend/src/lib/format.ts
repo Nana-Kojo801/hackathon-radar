@@ -1,4 +1,4 @@
-import type { Hackathon } from "./api";
+import type { Format, Hackathon } from "./api";
 
 const DAY = 86_400_000;
 
@@ -9,131 +9,113 @@ export const SOURCE_NAME: Record<string, string> = {
   web: "the web",
 };
 
-export const FORMAT_LABEL: Record<string, string> = {
+export const FORMAT_LABEL: Record<Format, string> = {
   online: "Online",
   in_person: "In person",
   hybrid: "Hybrid",
   unknown: "Format TBA",
 };
 
-/** Ring colour per topic. Bright enough on the dark ground, distinct in lightness too. */
-const TOPIC_COLOR: Record<string, string> = {
-  "AI/ML": "#8B9CFF",
-  "web3/blockchain": "#B78CFF",
-  education: "#5BE3A1",
-  climate: "#5BE3A1",
-  gaming: "#FF7A66",
-  software: "#4FD1FF",
-  web: "#4FD1FF",
-  mobile: "#4FD1FF",
-  data: "#6FE7DD",
-  networking: "#6FE7DD",
-  "hardware/IoT": "#FF9F5A",
-  robotics: "#FF9F5A",
-  cybersecurity: "#FF6B9A",
-  health: "#F59AE0",
-  fintech: "#F5D06A",
-  "open-ended": "#FFC857",
+const CATEGORY_LABEL: Record<string, string> = {
+  "AI/ML": "AI & ML",
+  "web3/blockchain": "Web3 & blockchain",
+  "hardware/IoT": "Hardware & IoT",
+  "open-ended": "Open-ended",
+  software: "Software",
+  web: "Web",
+  mobile: "Mobile",
+  data: "Data",
+  robotics: "Robotics",
+  networking: "Networking",
+  cybersecurity: "Cybersecurity",
+  gaming: "Gaming",
+  health: "Health",
+  fintech: "Fintech",
+  climate: "Climate",
+  education: "Education",
 };
-export const NO_TOPIC = "#6B6F78";
 
-export function colorOf(h: Pick<Hackathon, "categories">): string {
-  const main = h.categories.find((c) => c !== "open-ended") ?? h.categories[0];
-  return (main && TOPIC_COLOR[main]) || NO_TOPIC;
+export function categoryLabel(c: string): string {
+  return CATEGORY_LABEL[c] ?? c.charAt(0).toUpperCase() + c.slice(1);
 }
 
-export function topicColor(c: string): string {
-  return TOPIC_COLOR[c] ?? NO_TOPIC;
+/** The category shown on a card: the most specific one we have. */
+export function mainCategory(h: Hackathon): string | null {
+  return h.categories.find((c) => c !== "open-ended") ?? h.categories[0] ?? null;
 }
 
-/** The moment that matters: registration deadline, else the start date. */
-export function targetTime(h: Hackathon): number | null {
-  const t = h.registration_deadline ?? h.start_date;
-  return t ? Date.parse(t) : null;
+export function sourceName(h: Pick<Hackathon, "source">): string {
+  return SOURCE_NAME[h.source] ?? h.source;
 }
 
-export function msLeft(h: Hackathon, now = Date.now()): number | null {
-  const t = targetTime(h);
-  return t == null ? null : t - now;
+export function prizeText(h: Hackathon): string {
+  if (h.prize_usd == null) return "Prize TBA";
+  if (h.prize_usd === 0) return "Non-cash prizes";
+  return `${h.prize_confidence === "low" ? "≈ " : ""}$${Math.round(h.prize_usd).toLocaleString("en-US")} USD`;
 }
 
-export function isUrgent(h: Hackathon, now = Date.now()): boolean {
-  const ms = msLeft(h, now);
-  return ms != null && ms > 0 && ms < 3 * DAY;
-}
-
-/** Share of the registration window still left, 0..1, or null when there is no deadline. */
-export function remaining(h: Hackathon, now = Date.now()): number | null {
-  if (!h.registration_deadline) return null;
-  const dl = Date.parse(h.registration_deadline);
-  if (dl <= now) return 0;
-  const st = h.start_date ? Date.parse(h.start_date) : null;
-  const open = st != null && st < dl ? st : dl - 30 * DAY;
-  if (now <= open) return 1;
-  return Math.max(0.02, Math.min(1, (dl - now) / (dl - open)));
-}
-
-export function shortLeft(h: Hackathon, now = Date.now()): string {
-  const ms = msLeft(h, now);
-  if (ms == null) return "Dates TBA";
-  if (ms <= 0) return "Closed";
-  const d = Math.floor(ms / DAY);
-  const n = d >= 1 ? `${d}d` : `${Math.max(1, Math.floor(ms / 3_600_000))}h`;
-  return h.registration_deadline ? `${n} left` : `${n} to start`;
-}
-
-export function longLeft(h: Hackathon, now = Date.now()): string {
-  const ms = msLeft(h, now);
-  if (ms == null) return "TBA";
-  if (ms <= 0) return "Closed";
-  const d = Math.floor(ms / DAY);
-  const hr = Math.floor((ms % DAY) / 3_600_000);
-  if (d >= 1) return `${d}d ${hr}h`;
-  const min = Math.floor((ms % 3_600_000) / 60_000);
-  return `${hr}h ${min}m`;
-}
-
-const compactFmt = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
-
-export function compactMoney(n: number | null | undefined): string {
-  if (n == null) return "—";
-  if (n === 0) return "Prizes";
-  return `$${compactFmt.format(n)}`;
-}
-
-export function prizeShort(h: Hackathon): string {
-  if (h.prize_usd == null) return "—";
-  if (h.prize_usd === 0) return "Non-cash";
-  return (h.prize_confidence === "low" ? "~" : "") + compactMoney(h.prize_usd);
-}
-
-export function fullMoney(n: number): string {
+export function money(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
-const dayFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-const dayYearFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const shortFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const timeFmt = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" });
 
-export function day(iso: string | null | undefined, withYear = false): string | null {
-  if (!iso) return null;
-  return (withYear ? dayYearFmt : dayFmt).format(new Date(iso));
+export function fullDate(iso: string | null | undefined): string | null {
+  return iso ? dateFmt.format(new Date(iso)) : null;
+}
+
+export function timeUtc(iso: string | null | undefined): string | null {
+  return iso ? `${timeFmt.format(new Date(iso))} UTC` : null;
+}
+
+/** "Oct 25 – Nov 1, 2026" (year shown once when both dates share it). */
+export function dateRange(start: string | null, end: string | null): string | null {
+  if (!start && !end) return null;
+  if (!start || !end) return fullDate(start ?? end);
+  const s = new Date(start);
+  const e = new Date(end);
+  if (s.getUTCFullYear() !== e.getUTCFullYear()) return `${fullDate(start)} – ${fullDate(end)}`;
+  return `${shortFmt.format(s)} – ${dateFmt.format(e)}`;
+}
+
+/** Whole calendar days between start and end dates, e.g. Oct 25 → Nov 1 = 7 days. */
+export function durationDays(start: string | null, end: string | null): string | null {
+  if (!start || !end) return null;
+  const s = new Date(start);
+  const e = new Date(end);
+  const a = Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate());
+  const b = Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), e.getUTCDate());
+  const d = Math.round((b - a) / DAY);
+  if (d <= 0) return "1 day";
+  return `${d} ${d === 1 ? "day" : "days"}`;
+}
+
+/** The card's deadline pill: "Closes Oct 24, 2026", or "Starts …" when only a start is known. */
+export function deadlineLabel(h: Hackathon): { text: string; tone: "red" | "grey" } | null {
+  if (h.registration_deadline) {
+    const past = Date.parse(h.registration_deadline) < Date.now();
+    return { text: `${past ? "Closed" : "Closes"} ${fullDate(h.registration_deadline)}`, tone: past ? "grey" : "red" };
+  }
+  if (h.start_date) return { text: `Starts ${fullDate(h.start_date)}`, tone: "grey" };
+  return null;
+}
+
+export function eligibilityLabel(h: Hackathon): { text: string; tone: "green" | "grey" } {
+  if (h.international_ok === true) return { text: "International", tone: "green" };
+  if (h.international_ok === false) return { text: "Regional", tone: "grey" };
+  return { text: "Eligibility not specified", tone: "green" };
 }
 
 export function timeAgo(iso: string | null | undefined, now = Date.now()): string {
-  if (!iso) return "never";
-  const mins = Math.round((now - Date.parse(iso)) / 60_000);
+  if (!iso) return "recently";
+  const mins = Math.max(0, Math.round((now - Date.parse(iso)) / 60_000));
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
   const h = Math.round(mins / 60);
   if (h < 48) return `${h}h ago`;
   return `${Math.round(h / 24)}d ago`;
-}
-
-export function isNew(h: Hackathon, firstRunAt: string | null, now = Date.now()): boolean {
-  const seen = Date.parse(h.first_seen_at);
-  if (now - seen > 2 * DAY) return false;
-  // Everything was "new" on the very first refresh, which isn't useful.
-  return !(firstRunAt && seen - Date.parse(firstRunAt) < 3_600_000);
 }
 
 export function hostOf(url: string): string {
@@ -144,7 +126,7 @@ export function hostOf(url: string): string {
   }
 }
 
-/** Strip the little markdown Devfolio descriptions carry. */
+/** Plain text from the light markdown some sources use. */
 export function cleanText(s: string | null | undefined): string {
   return (s ?? "")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")

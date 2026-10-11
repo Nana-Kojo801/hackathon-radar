@@ -1,22 +1,20 @@
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { Detail } from "./components/Detail";
-import { FilterSheet } from "./components/FilterSheet";
-import { ListView } from "./components/ListView";
 import { fetchJSON, type Hackathon, type Meta } from "./lib/api";
 import { applyFilters, type Filters, loadFilters, saveFilters } from "./lib/filters";
-import { detailId, goBack, navigate, useMedia, usePath } from "./lib/router";
+import { detailId, navigate, usePath } from "./lib/router";
+import { Details } from "./pages/Details";
+import { Discovery } from "./pages/Discovery";
 
 interface ListResponse {
   items: Hackathon[];
   total: number;
 }
 
-const pushSpring = { type: "spring", stiffness: 340, damping: 36, mass: 0.9 } as const;
+const ease = [0.16, 1, 0.3, 1] as const;
 
 export default function App() {
-  const wide = useMedia("(min-width: 900px)");
   const path = usePath();
   const routeId = detailId(path);
 
@@ -27,7 +25,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [filters, setFiltersState] = useState<Filters>(loadFilters);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -58,104 +56,88 @@ export default function App() {
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
     items.forEach((h) => h.categories.forEach((c) => counts.set(c, (counts.get(c) ?? 0) + 1)));
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([category, count]) => ({ category, count }));
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
   }, [items]);
-  const sheetCount = visible.length;
 
-  // On a wide screen the first result is shown when nothing is picked yet.
-  const selectedId = routeId ?? (wide ? visible[0]?.id ?? null : null);
-  const selected = items.find((h) => h.id === selectedId);
-  const phoneDetailOpen = !wide && !!routeId;
-
-  const open = useCallback((id: string) => navigate(`/h/${id}`), []);
-  const back = useCallback(() => goBack("/"), []);
-
+  // The list stays mounted under the detail page, so coming back restores
+  // the exact scroll position instead of jumping to the top.
+  const listScroll = useRef(0);
+  const prevId = useRef<string | null>(routeId);
+  useLayoutEffect(() => {
+    const was = prevId.current;
+    prevId.current = routeId;
+    if (routeId && !was) window.scrollTo(0, 0);
+    else if (routeId && was !== routeId) window.scrollTo(0, 0);
+    else if (!routeId && was) window.scrollTo(0, listScroll.current);
+  }, [routeId]);
   useEffect(() => {
-    if (!phoneDetailOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !sheetOpen && back();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [phoneDetailOpen, sheetOpen, back]);
+    if (routeId) return;
+    const onScroll = () => {
+      listScroll.current = window.scrollY;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [routeId]);
+
+  const onDetailSearch = useCallback(
+    (q: string) => {
+      setFilters({ ...filters, q });
+      setPage(1);
+      listScroll.current = 0;
+      navigate("/");
+      // Keep typing in the list's search box, which shows the results live.
+      requestAnimationFrame(() => {
+        const input = document.querySelector<HTMLInputElement>("#discovery-search");
+        input?.focus();
+        input?.setSelectionRange(q.length, q.length);
+      });
+    },
+    [filters, setFilters],
+  );
+
+  const lastRefresh = meta?.last_refresh ?? null;
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="h-full overflow-hidden wide:flex">
-        <motion.div
-          className="thin-scroll h-full overflow-y-auto wide:w-[min(50%,600px)] wide:shrink-0 wide:border-r wide:border-line"
-          animate={phoneDetailOpen ? { x: -56, opacity: 0.4, scale: 0.985 } : { x: 0, opacity: 1, scale: 1 }}
-          transition={pushSpring}
-          aria-hidden={phoneDetailOpen || undefined}
-        >
-          <ListView
-            items={visible}
-            loading={loading}
-            slow={slow}
-            error={error}
-            onRetry={() => setReload((r) => r + 1)}
-            filters={filters}
-            setFilters={setFilters}
-            openFilters={() => setSheetOpen(true)}
-            selectedId={wide ? selectedId : null}
-            onOpen={open}
-            lastRefresh={meta?.last_refresh ?? null}
-            firstRunAt={meta?.first_run_at ?? null}
-          />
-        </motion.div>
-
-        {wide && (
-          <main className="relative h-full min-w-0 flex-1">
-            <AnimatePresence mode="wait" initial={false}>
-              {selectedId ? (
-                <motion.div
-                  key={selectedId}
-                  className="h-full"
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10, transition: { duration: 0.14 } }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                >
-                  <Detail id={selectedId} initial={selected} showBack={false} onBack={back} />
-                </motion.div>
-              ) : (
-                <motion.div key="empty" className="flex h-full items-center justify-center text-muted" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  {loading ? "" : "Pick a hackathon to see the details."}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </main>
-        )}
+      <div className="min-h-screen bg-canvas wide:px-4 wide:py-4">
+        <div className="relative mx-auto min-h-screen max-w-[1220px] overflow-clip bg-white wide:min-h-[calc(100vh-2rem)] wide:rounded-[10px] wide:border wide:border-line wide:shadow-[0_1px_2px_rgba(10,16,51,0.04)]">
+          <div hidden={!!routeId} aria-hidden={!!routeId}>
+            <Discovery
+              items={visible}
+              totalCount={items.length}
+              loading={loading}
+              slow={slow}
+              error={error}
+              onRetry={() => setReload((n) => n + 1)}
+              filters={filters}
+              setFilters={setFilters}
+              categories={categories}
+              lastRefresh={lastRefresh}
+              page={page}
+              setPage={setPage}
+            />
+          </div>
+          <AnimatePresence mode="wait" initial={false}>
+            {routeId && (
+              <motion.div
+                key={routeId}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0, transition: { duration: 0.4, ease } }}
+                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+              >
+                <Details
+                  id={routeId}
+                  initial={items.find((h) => h.id === routeId)}
+                  totalCount={items.length || meta?.active_count || 0}
+                  lastRefresh={lastRefresh}
+                  query=""
+                  onSearch={onDetailSearch}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
-
-      <AnimatePresence>
-        {phoneDetailOpen && routeId && (
-          <motion.div
-            key="phone-detail"
-            className="fixed inset-0 z-30 bg-ground shadow-[-20px_0_40px_rgba(0,0,0,0.5)]"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={pushSpring}
-            drag="x"
-            dragDirectionLock
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={{ left: 0, right: 0.6 }}
-            onDragEnd={(_, info) => {
-              if (info.offset.x > 110 || info.velocity.x > 650) back();
-            }}
-          >
-            <Detail key={routeId} id={routeId} initial={selected} showBack onBack={back} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <FilterSheet
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        filters={filters}
-        setFilters={setFilters}
-        categories={categories}
-        resultCount={sheetCount}
-      />
     </MotionConfig>
   );
 }

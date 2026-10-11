@@ -26,7 +26,7 @@ backend/
     enrich.py     the structured OpenAI call and its cost guards
     run.py        entry point
   tests/
-frontend/         React + Vite + TypeScript + Tailwind + Framer Motion (wrangler.jsonc = Cloudflare config)
+frontend/         React + Vite + TypeScript + Tailwind + Framer Motion + shadcn-style Radix components
 .github/workflows/refresh.yml   the 6-hourly cron
 render.yaml       Render blueprint for the API
 DECISIONS.md      choices that differ from (or fill gaps in) the spec
@@ -120,16 +120,15 @@ A Postgres advisory lock stops two refreshes from running at once.
 
 ## Frontend
 
-The UI is design H ("Rings"), a dark theme.
+The UI follows the "Atlantic" design: a light theme with two pages.
 
-- **List:** each hackathon is a ring that empties as its registration deadline approaches, with the prize in the middle.
-- **Detail page:** the outer ring is the time left to register and the inner ring is how the prize money splits.
+- **Explore hackathons (`/`):** search, filters (format, international, student-only, category, minimum prize), sort, a cards/table switch, and pages of 10. On a phone the filters open in a bottom sheet.
+- **Hackathon details (`/h/<id>`):** the key facts strip, tabs that follow your scroll (Overview, Eligibility, Key dates, Prize details, Source), the prize breakdown, and a Register button. The button sits in a sidebar on desktop and is pinned to the bottom on a phone.
 
 How it behaves:
 
-- **Phone:** tapping a ring slides the detail page in. Swipe right, use the back button, or press Escape to return.
-- **Wide screens (900px+):** the list and the detail page sit side by side.
-- **Links:** every hackathon has its own link, `/h/<id>`, which you can share. `wrangler.jsonc` tells Cloudflare to serve the app for these paths.
+- **Links:** every hackathon has its own link, `/h/<id>`, which you can share. The Cloudflare Worker serves the app for these paths.
+- **Going back** returns you to the same place in the list, with your filters kept.
 - **Speed:** filtering, sorting and search all happen in the browser, so they respond instantly.
 - **Accessibility:** animations follow the device's "reduce motion" setting.
 

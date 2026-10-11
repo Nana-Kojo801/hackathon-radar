@@ -1,117 +1,161 @@
 @import "tailwindcss";
 
+/* "Atlantic" design tokens, sampled from the design comps. */
 @theme {
-  --font-display: "Red Hat Display", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "Red Hat Text", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --breakpoint-wide: 900px;
 
-  --color-ground: #0e0f12;
-  --color-panel: #17181c;
-  --color-raised: #1d1e23;
-  --color-line: #26282e;
-  --color-ink: #f2f3f5;
-  --color-soft: #c5c8cf;
-  --color-muted: #9ea2ab;
-  --color-urgent: #ff6b6b;
+  --color-canvas: #f1f9fc; /* page behind the white panel */
+  --color-ink: #0a1033; /* titles, prize */
+  --color-ink-2: #08153c; /* strong body */
+  --color-slate: #5a6390; /* labels */
+  --color-body: #6b7096; /* paragraphs */
+  --color-lead: #4c4e78; /* lead paragraph */
+  --color-periwinkle: #4a68c2; /* list organizer, summary, meta */
+  --color-teal: #017c91; /* primary */
+  --color-teal-600: #016a7c;
+  --color-teal-text: #0d869d; /* organizer link on details */
+  --color-sky: #0a9bd5; /* cards toggle, next */
+  --color-line: #e6ebf2;
+  --color-field: #f5f8fb;
+  --color-field-line: #e1e8f1;
+
+  --color-pill-blue-bg: #e5f1fd;
+  --color-pill-blue: #1d5ed8;
+  --color-pill-sky-bg: #e9f5fb;
+  --color-pill-sky: #1890cf;
+  --color-pill-green-bg: #e3f6ec;
+  --color-pill-green: #188a3a;
+  --color-pill-red-bg: #feeadf;
+  --color-pill-red: #e23a1e;
+  --color-pill-grey-bg: #eef1f6;
+  --color-pill-grey: #5a6390;
+  --color-orange: #f97316;
+  --color-chip: #ddecfc;
 }
 
-/* Lets the ring fill animate: CSS can't transition gradients, but it can transition a typed number. */
-@property --p {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    margin: 0;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::selection {
+    background: #bfe9f0;
+  }
+  button,
+  [role="button"],
+  [role="option"] {
+    cursor: pointer;
+  }
 }
 
-html,
-body,
-#root {
-  height: 100%;
+/* Radix popovers animate from their data-state, shadcn style. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
-
-body {
-  margin: 0;
-  background: var(--color-ground);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
-  overscroll-behavior-y: none;
+@keyframes pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
 }
-
-::selection {
-  background: #8b9cff55;
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
-
-.ring {
-  border-radius: 9999px;
-  background: conic-gradient(var(--c) calc(var(--p) * 1%), var(--track, #26282e) 0);
-  transition: --p 1.3s cubic-bezier(0.22, 1, 0.36, 1);
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
-
-.split-ring {
-  border-radius: 9999px;
-  -webkit-mask: conic-gradient(#000 calc(var(--p) * 1%), transparent 0);
-  mask: conic-gradient(#000 calc(var(--p) * 1%), transparent 0);
-  transition: --p 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.25s;
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
-
-.scrollbar-none {
-  scrollbar-width: none;
+@keyframes sheet-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
 }
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-
-.thin-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: #2e3037 transparent;
-}
-
-@keyframes pulse-dot {
-  0%,
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
   100% {
-    box-shadow: 0 0 0 0 rgb(255 107 107 / 0.55);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgb(255 107 107 / 0);
+    background-position: 400px 0;
   }
 }
-.pulse-dot {
-  animation: pulse-dot 1.8s ease-in-out infinite;
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
-.spin {
-  animation: spin 1.1s linear infinite;
-}
 
-@keyframes shimmer {
-  0% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 0.9;
-  }
-  100% {
-    opacity: 0.45;
-  }
+.anim-pop[data-state="open"] {
+  animation: pop-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.shimmer {
-  animation: shimmer 1.6s ease-in-out infinite;
+.anim-pop[data-state="closed"] {
+  animation: pop-out 0.1s ease-in;
+}
+.anim-fade[data-state="open"] {
+  animation: fade-in 0.2s ease-out;
+}
+.anim-fade[data-state="closed"] {
+  animation: fade-out 0.15s ease-in;
+}
+.anim-sheet[data-state="open"] {
+  animation: sheet-up 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.anim-sheet[data-state="closed"] {
+  animation: sheet-down 0.22s ease-in;
+}
+.skeleton {
+  background: linear-gradient(90deg, #eef2f7 0, #f7f9fc 40px, #eef2f7 80px);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.spin {
+  animation: spin 0.9s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ring,
-  .split-ring {
-    transition: none;
-  }
-  .pulse-dot,
-  .spin,
-  .shimmer {
-    animation: none;
+  .anim-pop,
+  .anim-fade,
+  .anim-sheet,
+  .skeleton,
+  .spin {
+    animation: none !important;
   }
 }
