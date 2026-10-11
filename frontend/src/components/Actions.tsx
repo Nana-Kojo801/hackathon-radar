@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { Hackathon } from "../lib/api";
 import { calendarEvents, downloadIcs, googleCalendarUrl, pageUrl } from "../lib/calendar";
-import { prizeText } from "../lib/format";
+import { deadlineLabel, prizeText } from "../lib/format";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 
@@ -91,7 +91,9 @@ export function ShareButton({ h, className }: { h: Hackathon; className?: string
     const touch = window.matchMedia("(pointer: coarse)").matches;
     if (touch && typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: h.title, text: `${h.title} · ${prizeText(h)}`, url });
+        // The link goes inside the text, after a blank line. Passed separately, most
+        // apps glue it onto the end of the text with just a space.
+        await navigator.share({ title: h.title, text: shareMessage(h, url) });
         return;
       } catch (e) {
         if ((e as DOMException).name === "AbortError") return; // closed the share sheet
@@ -118,6 +120,21 @@ export function ShareButton({ h, className }: { h: Hackathon; className?: string
       </AnimatePresence>
     </Button>
   );
+}
+
+/**
+ * What the share sheet sends:
+ *
+ *   ETHGlobal Mumbai
+ *   $157,500 USD prize pool · Closes in 23 days
+ *
+ *   https://…/h/<id>
+ */
+export function shareMessage(h: Hackathon, url: string): string {
+  const prize = h.prize_usd ? `${prizeText(h)} prize pool` : prizeText(h);
+  const deadline = deadlineLabel(h);
+  const details = [prize, deadline && deadline.tone === "red" ? deadline.text : null].filter(Boolean).join(" · ");
+  return `${h.title}\n${details}\n\n${url}`;
 }
 
 async function copy(text: string): Promise<boolean> {
