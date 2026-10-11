@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowUpRight, CalendarDays, Globe, Monitor, Tag } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CalendarDays, CalendarRange, Globe, MapPin, Monitor, Shuffle, Tag } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { SearchField, TopBar } from "../components/Brand";
@@ -24,6 +24,8 @@ import {
 } from "../lib/format";
 import { goBack } from "../lib/router";
 import { cn } from "../lib/utils";
+
+const FORMAT_ICON = { online: Monitor, in_person: MapPin, hybrid: Shuffle, unknown: Monitor } as const;
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -118,6 +120,17 @@ function StatusBadge({ h }: { h: Hackathon }) {
   );
 }
 
+/** "Closes in 12 days" for the summary card; nothing when there's no deadline. */
+function closesIn(h: Hackathon): { text: string; tone: "red" | "sky" | "grey" } | null {
+  if (!h.registration_deadline) return null;
+  const ms = Date.parse(h.registration_deadline) - Date.now();
+  if (Number.isNaN(ms)) return null;
+  if (ms < 0) return { text: "Registration closed", tone: "grey" };
+  const days = Math.floor(ms / 86_400_000);
+  if (days === 0) return { text: "Closes today", tone: "red" };
+  return { text: `Closes in ${days} ${days === 1 ? "day" : "days"}`, tone: days <= 7 ? "red" : "sky" };
+}
+
 function statusNote(h: Hackathon): string {
   if (h.status === "open") return "Registrations are currently open. Check the organizer's page for the latest updates.";
   if (h.status === "upcoming") return "This hackathon hasn't started yet. Check the organizer's page for registration details.";
@@ -152,9 +165,11 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
     "Check organizer rules for full eligibility details.",
   ];
 
-  const formatIcon = <Monitor className="h-[22px] w-[22px] text-[#0e5e75]" strokeWidth={1.8} />;
+  const FormatIcon = FORMAT_ICON[h.format];
+  const formatIcon = <FormatIcon className="h-[22px] w-[22px] text-[#0e5e75]" strokeWidth={1.8} />;
   const globe = <Globe className="h-[22px] w-[22px] text-[#2563eb]" strokeWidth={1.8} />;
   const tag = <Tag className="h-[21px] w-[21px] text-ink" strokeWidth={1.8} />;
+  const countdown = closesIn(h);
   const cal = <CalendarDays className="h-[21px] w-[21px] text-orange" strokeWidth={1.9} />;
   const eligPill = <Badge tone={elig.tone}>{elig.text}</Badge>;
   const catPill = cat ? <Badge tone="blue">{categoryLabel(cat)}</Badge> : <span className="text-[16px] text-body">Not tagged</span>;
@@ -213,52 +228,48 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
           </Stat>
         </motion.div>
 
-        {/* Mobile stats grid */}
-        <div className="mt-5 grid grid-cols-2 border-b border-line pb-4 wide:hidden">
-          <MStat border>
-            <div className="text-[21px] font-bold text-ink">{prizeText(h)}</div>
-            <div className="text-[14px] text-slate">Prize pool</div>
-          </MStat>
-          <MStat>
-            <IconLine icon={cal} small>
-              {regDate ?? "Not announced"}
-            </IconLine>
-            <div className="pl-[31px] text-[13px] text-slate">Registration deadline</div>
-          </MStat>
-          <MStat border>
-            <IconLine icon={cal} small>
-              {dates ?? "TBA"}
-            </IconLine>
-            <div className="pl-[31px] text-[13px] text-slate">Event dates</div>
-            {days && <div className="pl-[31px] text-[13px] text-slate">{days}</div>}
-          </MStat>
-          <MStat>
-            <IconLine icon={formatIcon} small>
-              {FORMAT_LABEL[h.format]}
-            </IconLine>
-            <div className="pl-[31px] text-[13px] text-slate">Format</div>
-          </MStat>
-          <MStat border>
-            <IconLine icon={globe} small>
-              <Badge tone={elig.tone} size="sm" className="h-[28px] text-[14.5px]">
+        {/* Mobile key facts: one summary card */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+          className="mt-5 overflow-hidden rounded-[14px] border border-line wide:hidden"
+        >
+          <div className="flex items-start justify-between gap-3 bg-gradient-to-br from-[#eef8fb] to-[#f7fbfd] px-4 pt-3.5 pb-4">
+            <div className="min-w-0">
+              <div className="text-[13px] font-medium text-slate">Prize pool</div>
+              <div className="mt-0.5 text-[26px] leading-tight font-bold tracking-[-0.01em] text-ink">{prizeText(h)}</div>
+            </div>
+            {countdown && (
+              <Badge tone={countdown.tone} size="sm" className="mt-0.5 shrink-0 rounded-full px-2.5">
+                {countdown.text}
+              </Badge>
+            )}
+          </div>
+          <div className="divide-y divide-line">
+            <FactRow icon={<CalendarDays className="h-[18px] w-[18px]" strokeWidth={2} />} label="Registration deadline" value={regDate ?? "Not announced"} meta={regTime} />
+            <FactRow icon={<CalendarRange className="h-[18px] w-[18px]" strokeWidth={2} />} label="Event dates" value={dates ?? "TBA"} meta={days} />
+            <div className="flex flex-wrap gap-2 px-4 py-3.5">
+              <Badge tone="grey" size="sm" className="h-[28px] gap-1.5 text-[13.5px] text-ink-2" title="Format">
+                <span className="sr-only">Format: </span>
+                <FormatIcon className="h-[15px] w-[15px] text-[#0e5e75]" strokeWidth={2} />
+                {FORMAT_LABEL[h.format]}
+              </Badge>
+              <Badge tone={elig.tone} size="sm" className="h-[28px] gap-1.5 text-[13.5px]" title="Eligibility">
+                <span className="sr-only">Eligibility: </span>
+                <Globe className="h-[15px] w-[15px]" strokeWidth={2} />
                 {elig.text}
               </Badge>
-            </IconLine>
-            <div className="pl-[31px] text-[13px] text-slate">Eligibility</div>
-          </MStat>
-          <MStat>
-            <IconLine icon={tag} small>
-              {cat ? (
-                <Badge tone="blue" size="sm" className="h-[28px] text-[14.5px]">
+              {cat && (
+                <Badge tone="blue" size="sm" className="h-[28px] gap-1.5 text-[13.5px]" title="Category">
+                  <span className="sr-only">Category: </span>
+                  <Tag className="h-[15px] w-[15px]" strokeWidth={2} />
                   {categoryLabel(cat)}
                 </Badge>
-              ) : (
-                "Not tagged"
               )}
-            </IconLine>
-            <div className="pl-[31px] text-[13px] text-slate">Category</div>
-          </MStat>
-        </div>
+            </div>
+          </div>
+        </motion.div>
 
         <Tabs />
 
@@ -404,8 +415,19 @@ function Stat({ label, children, first, last }: { label: string; children: React
   );
 }
 
-function MStat({ children, border }: { children: ReactNode; border?: boolean }) {
-  return <div className={cn("py-2.5", border ? "border-r border-line pr-3" : "pl-4")}>{children}</div>;
+function FactRow({ icon, label, value, meta }: { icon: ReactNode; label: string; value: string; meta: string | null }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#fff1e6] text-orange">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[12.5px] text-slate">{label}</div>
+        <div className="text-[15.5px] leading-snug font-semibold text-ink">
+          <Breakable text={value} />
+        </div>
+      </div>
+      {meta && <div className="shrink-0 self-end pb-px text-[12.5px] text-slate">{meta}</div>}
+    </div>
+  );
 }
 
 function IconLine({ icon, children, small }: { icon: ReactNode; children: ReactNode; small?: boolean }) {
