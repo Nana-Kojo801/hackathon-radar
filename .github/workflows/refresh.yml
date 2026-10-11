@@ -1,0 +1,46 @@
+name: Refresh hackathons
+
+on:
+  schedule:
+    - cron: "17 */6 * * *" # every 6 hours (off the top of the hour to dodge the cron rush)
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: "Comma-separated sources to run (blank = all): devpost,devfolio,mlh,web"
+        required: false
+        default: ""
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Run pipeline
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SEARCH_API_KEY: ${{ secrets.SEARCH_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o-mini' }}
+          MAX_ENRICH_PER_RUN: ${{ vars.MAX_ENRICH_PER_RUN || '60' }}
+          MAX_DISCOVERY_PAGES: ${{ vars.MAX_DISCOVERY_PAGES || '12' }}
+          SOURCES: ${{ github.event.inputs.sources }}
+        run: |
+          if [ -n "$SOURCES" ]; then
+            python -m pipeline.run --sources "$SOURCES"
+          else
+            python -m pipeline.run
+          fi

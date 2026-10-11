@@ -108,6 +108,7 @@ def _update_primary(cur, row: dict, n: Normalized) -> None:
             end_date = COALESCE(%(end)s, end_date),
             registration_deadline = COALESCE(%(deadline)s, registration_deadline),
             dates_text = COALESCE(%(dates_text)s, dates_text),
+            enrich_attempts = CASE WHEN content_hash = %(hash)s THEN enrich_attempts ELSE 0 END,
             content_hash = %(hash)s,
             hints = %(hints)s,
             raw_payload = %(raw)s,

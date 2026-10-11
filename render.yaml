@@ -1,0 +1,28 @@
+# Render Blueprint: New > Blueprint > pick this repo. Free web service for the API.
+services:
+  - type: web
+    name: hackathon-radar-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SEARCH_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: MAX_ENRICH_PER_RUN
+        value: "60"
