@@ -1,4 +1,4 @@
-import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion, useAnimate, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { fetchJSON, type Hackathon, type Meta } from "./lib/api";
@@ -13,6 +13,10 @@ interface ListResponse {
 }
 
 const ease = [0.16, 1, 0.3, 1] as const;
+
+// The app restores the list's scroll itself; the browser's own restoration on
+// Back would jump the page before the transition runs.
+if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
 
 export default function App() {
   const path = usePath();
@@ -59,31 +63,79 @@ export default function App() {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
   }, [items]);
 
-  // The list stays mounted under the detail page, so coming back restores
-  // the exact scroll position instead of jumping to the top.
+  // Page transitions run in two steps so the two pages are never on screen
+  // together: the current page fades out, then the next one fades in. The list
+  // stays mounted (hidden) under the detail page, so going back restores its
+  // scroll position and briefly marks the hackathon you came back from.
+  const reduced = useReducedMotion();
+  const [listScope, animateList] = useAnimate<HTMLDivElement>();
+  const [view, setView] = useState<string | null>(routeId); // detail id, or null for the list
+  const [listShown, setListShown] = useState(!routeId);
+  const [highlight, setHighlight] = useState<string | null>(null);
   const listScroll = useRef(0);
-  const prevId = useRef<string | null>(routeId);
-  useLayoutEffect(() => {
-    const was = prevId.current;
-    prevId.current = routeId;
-    if (routeId && !was) window.scrollTo(0, 0);
-    else if (routeId && was !== routeId) window.scrollTo(0, 0);
-    else if (!routeId && was) window.scrollTo(0, listScroll.current);
-  }, [routeId]);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const enterList = useRef(false);
+
   useEffect(() => {
-    if (routeId) return;
-    const onScroll = () => {
+    if (routeId === view) {
+      // Back pressed while the list was still fading out: bring it straight back.
+      if (view === null && listScope.current) animateList(listScope.current, { opacity: 1, y: 0 }, { duration: 0.2 });
+      return;
+    }
+    let cancelled = false;
+    if (view === null) {
+      // List → detail: remember where we were, fade the list out, then show the detail page.
       listScroll.current = window.scrollY;
+      const done = () => {
+        if (cancelled) return;
+        setListShown(false);
+        setView(routeId);
+      };
+      if (reduced || !listScope.current) done();
+      else animateList(listScope.current, { opacity: 0, y: -6 }, { duration: 0.16, ease: "easeIn" }).then(done);
+    } else {
+      // Detail → list (or another detail): AnimatePresence fades the detail page out first.
+      if (routeId === null) setHighlight(view);
+      setView(routeId);
+    }
+    return () => {
+      cancelled = true;
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [routeId]);
+  }, [routeId, view, reduced, animateList, listScope]);
+
+  const onDetailExited = useCallback(() => {
+    if (viewRef.current !== null) return;
+    enterList.current = true;
+    setListShown(true);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (view !== null) window.scrollTo(0, 0);
+  }, [view]);
+
+  useLayoutEffect(() => {
+    if (!listShown || !enterList.current) return;
+    enterList.current = false;
+    window.scrollTo(0, listScroll.current);
+    if (listScope.current) {
+      if (reduced) listScope.current.style.cssText = "";
+      else animateList(listScope.current, { opacity: [0, 1], y: [10, 0] }, { duration: 0.34, ease: [0.16, 1, 0.3, 1] });
+    }
+  }, [listShown, reduced, animateList, listScope]);
+
+  useEffect(() => {
+    if (!highlight) return;
+    const t = setTimeout(() => setHighlight(null), 2200);
+    return () => clearTimeout(t);
+  }, [highlight]);
 
   const onDetailSearch = useCallback(
     (q: string) => {
       setFilters({ ...filters, q });
       setPage(1);
       listScroll.current = 0;
+      setHighlight(null);
       navigate("/");
       // Keep typing in the list's search box, which shows the results live.
       requestAnimationFrame(() => {
@@ -101,7 +153,7 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen bg-canvas wide:px-4 wide:py-4">
         <div className="relative mx-auto min-h-screen max-w-[1220px] overflow-clip bg-white wide:min-h-[calc(100vh-2rem)] wide:rounded-[10px] wide:border wide:border-line wide:shadow-[0_1px_2px_rgba(10,16,51,0.04)]">
-          <div hidden={!!routeId} aria-hidden={!!routeId}>
+          <div ref={listScope} hidden={!listShown}>
             <Discovery
               items={visible}
               totalCount={items.length}
@@ -115,19 +167,20 @@ export default function App() {
               lastRefresh={lastRefresh}
               page={page}
               setPage={setPage}
+              highlightId={highlight}
             />
           </div>
-          <AnimatePresence mode="wait" initial={false}>
-            {routeId && (
+          <AnimatePresence mode="wait" initial={false} onExitComplete={onDetailExited}>
+            {view && (
               <motion.div
-                key={routeId}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0, transition: { duration: 0.4, ease } }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                key={view}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0, transition: { duration: 0.38, ease } }}
+                exit={{ opacity: 0, y: 8, transition: { duration: 0.18, ease: "easeIn" } }}
               >
                 <Details
-                  id={routeId}
-                  initial={items.find((h) => h.id === routeId)}
+                  id={view}
+                  initial={items.find((h) => h.id === view)}
                   totalCount={items.length || meta?.active_count || 0}
                   lastRefresh={lastRefresh}
                   query=""

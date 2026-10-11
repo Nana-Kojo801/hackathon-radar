@@ -47,6 +47,7 @@ interface Props {
   lastRefresh: string | null;
   page: number;
   setPage: (p: number) => void;
+  highlightId?: string | null;
 }
 
 function open(id: string) {
@@ -237,12 +238,12 @@ export function Discovery(p: Props) {
           </Button>
         </motion.div>
       ) : f.view === "table" ? (
-        <TableView rows={rows} listKey={listKey} />
+        <TableView rows={rows} listKey={listKey} highlightId={p.highlightId} />
       ) : (
         <ul key={listKey}>
           <AnimatePresence initial={true}>
             {rows.map((h, i) => (
-              <Row key={h.id} h={h} index={i} />
+              <Row key={h.id} h={h} index={i} highlight={h.id === p.highlightId} />
             ))}
           </AnimatePresence>
         </ul>
@@ -290,13 +291,12 @@ function Pills({ h, compact }: { h: Hackathon; compact?: boolean }) {
   );
 }
 
-function Row({ h, index }: { h: Hackathon; index: number }) {
+function Row({ h, index, highlight }: { h: Hackathon; index: number; highlight: boolean }) {
   const deadline = deadlineLabel(h);
   const dates = dateRange(h.start_date, h.end_date);
   const summary = h.summary;
   return (
     <motion.li
-      layout
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
@@ -310,7 +310,7 @@ function Row({ h, index }: { h: Hackathon; index: number }) {
           e.preventDefault();
           open(h.id);
         }}
-        className="group block px-5 py-4 transition-colors duration-200 outline-none hover:bg-[#f7fbfd] focus-visible:bg-[#f2f9fc] wide:flex wide:items-start wide:justify-between wide:gap-8 wide:px-7 wide:py-5"
+        className={cn(highlight && "row-flash", "group block px-5 py-4 transition-colors duration-200 outline-none hover:bg-[#f7fbfd] focus-visible:bg-[#f2f9fc] wide:flex wide:items-start wide:justify-between wide:gap-8 wide:px-7 wide:py-5")}
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
@@ -366,7 +366,7 @@ function Row({ h, index }: { h: Hackathon; index: number }) {
   );
 }
 
-function TableView({ rows, listKey }: { rows: Hackathon[]; listKey: string }) {
+function TableView({ rows, listKey, highlightId }: { rows: Hackathon[]; listKey: string; highlightId?: string | null }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[860px] text-left text-[15px]">
@@ -392,7 +392,7 @@ function TableView({ rows, listKey }: { rows: Hackathon[]; listKey: string }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: i * 0.025 }}
                 onClick={() => open(h.id)}
-                className="group cursor-pointer border-b border-line transition-colors hover:bg-[#f7fbfd]"
+                className={cn("group cursor-pointer border-b border-line transition-colors hover:bg-[#f7fbfd]", h.id === highlightId && "row-flash")}
               >
                 <td className="max-w-[340px] py-3.5 pr-4 pl-7">
                   <a

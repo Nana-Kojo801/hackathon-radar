@@ -159,3 +159,21 @@
     animation: none !important;
   }
 }
+
+/* The row you came back from glows briefly so your eye lands on it. */
+@keyframes row-flash {
+  from {
+    background-color: #e3f3f7;
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.row-flash {
+  animation: row-flash 1.5s cubic-bezier(0.4, 0, 0.2, 1) 0.25s backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .row-flash {
+    animation: none;
+  }
+}
