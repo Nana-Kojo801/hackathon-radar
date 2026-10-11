@@ -1,0 +1,19 @@
+// Cloudflare Worker config. The site is static assets (dist/), plus a small
+// script (worker/index.ts) that only runs for "/" and "/h/<id>" to add link
+// preview tags. "name" must match the Worker's name in the Cloudflare dashboard.
+{
+  "name": "hackathon-radar",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/", "/h/*"]
+  },
+  "vars": {
+    // Where app/snapshot.py publishes the data (GitHub Pages).
+    "SNAPSHOT_URL": "https://nana-kojo801.github.io/hackathon-radar"
+  },
+  "observability": { "enabled": true }
+}

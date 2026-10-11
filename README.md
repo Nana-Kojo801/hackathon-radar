@@ -131,6 +131,7 @@ The UI follows the "Atlantic" design: a light theme with two pages.
 How it behaves:
 
 - **Links:** every hackathon has its own link, `/h/<id>`, which you can share. The Cloudflare Worker serves the app for these paths.
+- **Link previews:** when a link is pasted into WhatsApp, Messages, Slack and so on, the card shows the hackathon's name, prize, deadline, location and summary, with the Hackscout image (`public/og-image.png`). A small Worker script (`frontend/worker/index.ts`, configured in `frontend/wrangler.jsonc`) runs only for `/` and `/h/<id>`: it reads the hackathon from the GitHub Pages snapshot and adds the preview tags to the page. Everything else is served straight from the static files. If you rename the Worker in Cloudflare, change `name` in `wrangler.jsonc` to match.
 - **Going back** returns you to the same place in the list, with your filters kept.
 - **Speed:** filtering, sorting and search all happen in the browser, so they respond instantly.
 - **Accessibility:** animations follow the device's "reduce motion" setting.
