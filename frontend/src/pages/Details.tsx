@@ -2,10 +2,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowUpRight, CalendarDays, CalendarRange, Globe, MapPin, Monitor, Shuffle, Tag } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import { CalendarButton, ShareButton } from "../components/Actions";
 import { SearchField, TopBar } from "../components/Brand";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
-import { fetchJSON, type Hackathon, type HackathonDetail } from "../lib/api";
+import { fetchData, type Hackathon, type HackathonDetail } from "../lib/api";
 import {
   categoryLabel,
   cleanText,
@@ -61,7 +62,7 @@ export function Details({ id, initial, totalCount, lastRefresh, query, onSearch 
     const ctrl = new AbortController();
     setDetail(null);
     setError(null);
-    fetchJSON<HackathonDetail>(`/hackathons/${id}`, ctrl.signal)
+    fetchData<HackathonDetail>(`h/${id}.json`, `/hackathons/${id}`, ctrl.signal)
       .then(setDetail)
       .catch((e) => !ctrl.signal.aborted && setError(e instanceof Error ? e.message : String(e)));
     return () => ctrl.abort();
@@ -270,6 +271,11 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
           </div>
         </motion.div>
 
+        <div className="mt-3 grid grid-cols-2 gap-2.5 wide:hidden">
+          <CalendarButton h={h} />
+          <ShareButton h={h} />
+        </div>
+
         <Tabs />
 
         <div className="wide:mt-6 wide:grid wide:grid-cols-[minmax(0,1fr)_310px] wide:gap-9">
@@ -355,6 +361,10 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
                   <ArrowUpRight className="h-[18px] w-[18px] transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
                 </a>
               </Button>
+              <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+                <CalendarButton h={h} className="h-10 text-[14.5px]" />
+                <ShareButton h={h} className="h-10 text-[14.5px]" />
+              </div>
               <dl className="mt-4">
                 <SideRow label="Format" icon={formatIcon}>
                   <span className="text-[16.5px] font-medium text-ink">{FORMAT_LABEL[h.format]}</span>

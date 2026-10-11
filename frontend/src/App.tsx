@@ -1,7 +1,7 @@
 import { MotionConfig, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { fetchJSON, type Hackathon, type Meta } from "./lib/api";
+import { fetchData, fetchJSON, type Hackathon, type Meta } from "./lib/api";
 import { healthWarning } from "./lib/health";
 import { applyFilters, type Filters, loadFilters, saveFilters } from "./lib/filters";
 import { detailId, navigate, usePath } from "./lib/router";
@@ -12,6 +12,9 @@ interface ListResponse {
   items: Hackathon[];
   total: number;
 }
+
+/** Refreshes run every 6 hours; two missed runs means the snapshot stopped updating. */
+const SNAPSHOT_STALE_AFTER = 13 * 3_600_000;
 
 /** Matches .page-leave in index.css. */
 const LEAVE_MS = 170;
@@ -39,14 +42,30 @@ export default function App() {
     setError(null);
     setSlow(false);
     const slowTimer = setTimeout(() => setSlow(true), 2500);
-    fetchJSON<ListResponse>("/hackathons?limit=500", ctrl.signal)
+    fetchData<ListResponse>("list.json", "/hackathons?limit=500", ctrl.signal)
       .then((r) => setItems(r.items))
       .catch((e) => !ctrl.signal.aborted && setError(e instanceof Error ? e.message : String(e)))
       .finally(() => {
         clearTimeout(slowTimer);
         if (!ctrl.signal.aborted) setLoading(false);
       });
-    fetchJSON<Meta>("/meta", ctrl.signal).then(setMeta).catch(() => undefined);
+    fetchData<Meta>("meta.json", "/meta", ctrl.signal)
+      .then((m) => {
+        setMeta(m);
+        // The copy is rebuilt after every refresh. If it stopped updating, keep
+        // showing it but ask the API too, and switch over if the API has newer data.
+        if (m.generated_at && Date.now() - Date.parse(m.generated_at) > SNAPSHOT_STALE_AFTER) {
+          Promise.all([fetchJSON<ListResponse>("/hackathons?limit=500", ctrl.signal), fetchJSON<Meta>("/meta", ctrl.signal)])
+            .then(([list, fresh]) => {
+              if (Date.parse(fresh.last_refresh ?? "") > Date.parse(m.last_refresh ?? "")) {
+                setItems(list.items);
+                setMeta(fresh);
+              }
+            })
+            .catch(() => undefined);
+        }
+      })
+      .catch(() => undefined);
     return () => {
       clearTimeout(slowTimer);
       ctrl.abort();

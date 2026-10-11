@@ -1,0 +1,49 @@
+name: Publish data snapshot
+
+# After each refresh, publish a static copy of the list and detail data to
+# GitHub Pages. The site reads it first, so it loads instantly even while the
+# free Render API is asleep. One-time setup: Settings > Pages > Source:
+# "GitHub Actions" (see README > Fast loading).
+
+on:
+  workflow_run:
+    workflows: ["Refresh hackathons"]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-data
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Build snapshot
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python -m app.snapshot ../site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

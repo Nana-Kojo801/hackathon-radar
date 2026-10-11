@@ -103,7 +103,8 @@ TEST_DATABASE_URL=postgresql://postgres:pg@localhost:5432/radar_test python -m p
 
    Then add the resulting site URL (`https://<project>.pages.dev` or `https://<project>.<you>.workers.dev`) to `ALLOWED_ORIGINS` on Render.
 4. **GitHub Actions (cron):** go to repo Settings → Secrets and variables → Actions and add the secrets `DATABASE_URL`, `OPENAI_API_KEY` and `SEARCH_API_KEY`. You can optionally add the variables `OPENAI_MODEL`, `MAX_ENRICH_PER_RUN` and `MAX_DISCOVERY_PAGES`. The workflow runs every 6 hours.
-5. **First fill:** trigger a manual refresh (see below). The first run stores every listing right away but only enriches 60 of them, so it takes about 4 runs (one day of cron, or a few manual runs) before every listing has an AI summary. Listings that aren't enriched yet still show up with their platform data: prize, dates, format and categories.
+5. **GitHub Pages (fast loading):** go to repo Settings → Pages → Build and deployment and set **Source** to **GitHub Actions**. After each refresh, the *Publish data snapshot* workflow puts a static copy of the data there (see [Fast loading](#fast-loading)). If you skip this, the site still works but waits for the API to wake up.
+6. **First fill:** trigger a manual refresh (see below). The first run stores every listing right away but only enriches 60 of them, so it takes about 4 runs (one day of cron, or a few manual runs) before every listing has an AI summary. Listings that aren't enriched yet still show up with their platform data: prize, dates, format and categories.
 
 Note: GitHub pauses scheduled workflows in repos with no activity for 60 days. If that happens, re-enable the workflow from the Actions tab.
 
@@ -123,7 +124,7 @@ A Postgres advisory lock stops two refreshes from running at once.
 The UI follows the "Atlantic" design: a light theme with two pages.
 
 - **Explore hackathons (`/`):** search, filters (format, international, student-only, one or more categories, minimum prize), sort (prize, deadline, newest, relevance), a cards/table switch, and pages of 10. On a phone the filters open in a bottom sheet. Cards show a countdown to the registration deadline for the coming month ("Closes in 12 days") and a **NEW** badge on hackathons first seen in the last 48 hours.
-- **Hackathon details (`/h/<id>`):** the key facts strip, tabs that follow your scroll (Overview, Eligibility, Key dates, Prize details, Source), the prize breakdown, and a Register button. The button sits in a sidebar on desktop and is pinned to the bottom on a phone.
+- **Hackathon details (`/h/<id>`):** the key facts strip, tabs that follow your scroll (Overview, Eligibility, Key dates, Prize details, Source), the prize breakdown, a Register button, **Add to calendar** (Google Calendar links, or an .ics file for Apple Calendar and Outlook with a reminder a day before the deadline) and **Share** (the phone's share sheet, or copies the link on a computer). Register sits in a sidebar on desktop and is pinned to the bottom on a phone.
 
 How it behaves:
 
@@ -131,6 +132,14 @@ How it behaves:
 - **Going back** returns you to the same place in the list, with your filters kept.
 - **Speed:** filtering, sorting and search all happen in the browser, so they respond instantly.
 - **Accessibility:** animations follow the device's "reduce motion" setting.
+
+## Fast loading
+
+The free Render API sleeps after 15 minutes idle and takes 30-60 seconds to wake. To avoid that wait, the site reads a static copy of the data first:
+
+- After every refresh, `.github/workflows/publish-data.yml` runs `python -m app.snapshot` and publishes the result to GitHub Pages (`https://<user>.github.io/<repo>/`): `list.json`, `meta.json` and one `h/<id>.json` per hackathon. The files are the API's own responses, so the two never differ.
+- The frontend fetches those files first (`SNAPSHOT_URL` in `frontend/src/lib/api.ts`, overridable with `VITE_SNAPSHOT_URL`, or `off`). It falls back to the API if a file is missing, and asks the API too if the copy is more than 13 hours old.
+- Run it by hand from Actions → *Publish data snapshot* → *Run workflow*.
 
 ## API
 

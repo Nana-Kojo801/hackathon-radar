@@ -1,6 +1,17 @@
 export const API_URL =
   (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") || "http://localhost:8000";
 
+/**
+ * Static copy of the data, published to GitHub Pages after every refresh
+ * (backend/app/snapshot.py). Read first so the site loads without waiting for
+ * the sleeping API. Override with VITE_SNAPSHOT_URL, or set it to "off".
+ */
+const SNAPSHOT_SETTING = import.meta.env.VITE_SNAPSHOT_URL as string | undefined;
+export const SNAPSHOT_URL =
+  SNAPSHOT_SETTING === "off"
+    ? null
+    : SNAPSHOT_SETTING?.replace(/\/$/, "") || (import.meta.env.PROD ? "https://nana-kojo801.github.io/hackathon-radar" : null);
+
 export type Format = "online" | "in_person" | "hybrid" | "unknown";
 
 export interface Hackathon {
@@ -62,6 +73,8 @@ export interface Meta {
   last_refresh: string | null;
   first_run_at: string | null;
   sources: SourceRun[];
+  /** Only on the snapshot copy: when it was built. */
+  generated_at?: string;
 }
 
 /**
@@ -90,4 +103,21 @@ export async function fetchJSON<T>(path: string, signal?: AbortSignal, attempts 
     await new Promise((r) => setTimeout(r, Math.min(2000 * (i + 1), 8000)));
   }
   throw lastError instanceof Error ? lastError : new Error("request failed");
+}
+
+/**
+ * Read from the snapshot when there is one, falling back to the API if it's
+ * missing or unreachable. "no-cache" revalidates with GitHub Pages each time
+ * (a cheap 304 when nothing changed), so a new snapshot shows up right away.
+ */
+export async function fetchData<T>(snapshotPath: string, apiPath: string, signal?: AbortSignal): Promise<T> {
+  if (SNAPSHOT_URL) {
+    try {
+      const res = await fetch(`${SNAPSHOT_URL}/${snapshotPath}`, { signal, cache: "no-cache" });
+      if (res.ok) return (await res.json()) as T;
+    } catch (e) {
+      if (signal?.aborted) throw e;
+    }
+  }
+  return fetchJSON<T>(apiPath, signal);
 }
