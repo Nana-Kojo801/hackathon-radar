@@ -310,7 +310,8 @@ function Row({ h, index, highlight, isNew }: { h: Hackathon; index: number; high
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1], delay: index * 0.035 }}
-      className="border-b border-line last:border-b-0"
+      // Phones: a 10px tinted band between cards, so each card reads as its own block.
+      className="border-b-[10px] border-[#e6eef6] last:border-b-0 wide:border-b wide:border-line wide:last:border-b-0"
     >
       <a
         href={`/h/${h.id}`}
@@ -362,13 +363,13 @@ function Row({ h, index, highlight, isNew }: { h: Hackathon; index: number; high
           <p className="mt-2 text-[13px] text-slate wide:hidden">{[dates, sourceName(h)].filter(Boolean).join("  •  ")}</p>
 
           {/* Mobile footer: the prize always sits in the same place, under the details */}
-          <div className="mt-3 flex items-end justify-between gap-3 border-t border-line/70 pt-3 wide:hidden">
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-[12px] bg-[#f3f8fc] px-3.5 py-2.5 wide:hidden">
             <div className="min-w-0">
               <div className={cn("text-[19px] leading-tight font-bold tracking-[-0.01em]", h.prize_usd ? "text-ink" : "text-slate")}>{prizeText(h)}</div>
               <div className="text-[12.5px] text-slate">Prize pool</div>
             </div>
             {deadline && (
-              <Badge tone={deadline.tone} size="sm" className="mb-0.5 shrink-0 rounded-full px-2.5" title={deadline.full ?? undefined}>
+              <Badge tone={deadline.tone} size="sm" className="shrink-0 rounded-full px-2.5" title={deadline.full ?? undefined}>
                 {deadline.text}
               </Badge>
             )}
