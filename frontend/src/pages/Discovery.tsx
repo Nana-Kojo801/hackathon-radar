@@ -322,13 +322,10 @@ function Row({ h, index, highlight, isNew }: { h: Hackathon; index: number; high
         className={cn(highlight && "row-flash", "group block px-5 py-4 transition-colors duration-200 outline-none hover:bg-[#f7fbfd] focus-visible:bg-[#f2f9fc] wide:flex wide:items-start wide:justify-between wide:gap-8 wide:px-7 wide:py-5")}
       >
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <h2 className="text-[18px] leading-snug font-bold tracking-[-0.01em] text-ink transition-colors duration-200 group-hover:text-teal wide:text-[31px] wide:leading-tight">
-              {h.title}
-              {isNew && <NewBadge className="ml-2 -translate-y-px wide:ml-3 wide:-translate-y-1" />}
-            </h2>
-            <span className="shrink-0 text-[17px] font-bold whitespace-nowrap text-ink wide:hidden">{prizeText(h)}</span>
-          </div>
+          <h2 className="text-[18px] leading-snug font-bold tracking-[-0.01em] text-ink transition-colors duration-200 group-hover:text-teal wide:text-[31px] wide:leading-tight">
+            {h.title}
+            {isNew && <NewBadge className="ml-2 -translate-y-px wide:ml-3 wide:-translate-y-1" />}
+          </h2>
           {h.organizer && (
             <p className="text-[14px] text-periwinkle wide:mt-0.5 wide:text-[17.5px]">
               <span className="hidden wide:inline">Organized by </span>
@@ -362,10 +359,20 @@ function Row({ h, index, highlight, isNew }: { h: Hackathon; index: number; high
           <div className="mt-2.5 flex flex-wrap gap-1.5 wide:hidden">
             <Pills h={h} compact />
           </div>
-          <p className="mt-2 text-[13px] text-slate wide:hidden">
-            {[deadline?.text, dates].filter(Boolean).join("  •  ")}
-          </p>
-          <p className="mt-0.5 text-[13px] text-slate wide:hidden">{sourceName(h)}</p>
+          <p className="mt-2 text-[13px] text-slate wide:hidden">{[dates, sourceName(h)].filter(Boolean).join("  •  ")}</p>
+
+          {/* Mobile footer: the prize always sits in the same place, under the details */}
+          <div className="mt-3 flex items-end justify-between gap-3 border-t border-line/70 pt-3 wide:hidden">
+            <div className="min-w-0">
+              <div className={cn("text-[19px] leading-tight font-bold tracking-[-0.01em]", h.prize_usd ? "text-ink" : "text-slate")}>{prizeText(h)}</div>
+              <div className="text-[12.5px] text-slate">Prize pool</div>
+            </div>
+            {deadline && (
+              <Badge tone={deadline.tone} size="sm" className="mb-0.5 shrink-0 rounded-full px-2.5" title={deadline.full ?? undefined}>
+                {deadline.text}
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="hidden shrink-0 text-right wide:block">
           <div className="text-[28px] font-bold tracking-[-0.01em] whitespace-nowrap text-ink">{prizeText(h)}</div>
