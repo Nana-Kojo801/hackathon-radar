@@ -159,8 +159,11 @@ def meta() -> dict:
             "SELECT count(*)::int AS n FROM hackathons WHERE NOT is_hidden AND status IN ('open', 'upcoming')"
         )
         active = cur.fetchone()["n"]
-        cur.execute("SELECT max(finished_at) AS t FROM source_runs WHERE source = 'pipeline'")
-        last_refresh = cur.fetchone()["t"]
+        cur.execute(
+            "SELECT max(finished_at) AS last, min(started_at) AS first FROM source_runs"
+            " WHERE source = 'pipeline'"
+        )
+        runs = cur.fetchone()
         cur.execute(
             "SELECT DISTINCT ON (source) source, started_at, finished_at, fetched, new, errors,"
             " error_text, tokens_used FROM source_runs ORDER BY source, started_at DESC"
@@ -171,7 +174,9 @@ def meta() -> dict:
     return {
         "categories": [{"category": c, "count": counts.get(c, 0)} for c in CATEGORIES],
         "active_count": active,
-        "last_refresh": last_refresh,
+        "last_refresh": runs["last"],
+        # Everything is "first seen" on the first run; the UI skips NEW badges for those.
+        "first_run_at": runs["first"],
         "sources": sources,
     }
 

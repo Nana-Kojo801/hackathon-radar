@@ -12,7 +12,6 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
-
 from app import config
 from app.categories import CATEGORIES
 

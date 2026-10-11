@@ -146,7 +146,12 @@ def main() -> None:
     p.add_argument("--no-enrich", action="store_true")
     args = p.parse_args()
     only = [s.strip() for s in args.sources.split(",")] if args.sources else None
-    run_pipeline(only=only, do_enrich=not args.no_enrich)
+    summary = run_pipeline(only=only, do_enrich=not args.no_enrich)
+    # One broken source is normal and must not fail the cron job; all of them
+    # failing at once means something bigger is wrong (network, DB), so say so.
+    results = list(summary.get("sources", {}).values())
+    if results and all(r["errors"] and not r["fetched"] for r in results):
+        raise SystemExit("every source failed")
 
 
 if __name__ == "__main__":
