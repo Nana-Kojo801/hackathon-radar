@@ -3,6 +3,8 @@ from ..types import Source
 
 def all_sources() -> list[Source]:
     """Every adapter, in dedupe priority order (richest sources first)."""
+    from .devfolio import DevfolioSource
     from .devpost import DevpostSource
+    from .mlh import MLHSource
 
-    return [DevpostSource()]
+    return [DevpostSource(), DevfolioSource(), MLHSource()]
