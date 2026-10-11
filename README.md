@@ -26,7 +26,7 @@ backend/
     enrich.py     the structured OpenAI call and its cost guards
     run.py        entry point
   tests/
-frontend/         React + Vite + TypeScript + Tailwind
+frontend/         React + Vite + TypeScript + Tailwind + Framer Motion (wrangler.jsonc = Cloudflare config)
 .github/workflows/refresh.yml   the 6-hourly cron
 render.yaml       Render blueprint for the API
 DECISIONS.md      choices that differ from (or fill gaps in) the spec
@@ -118,10 +118,25 @@ Any of these works:
 
 A Postgres advisory lock stops two refreshes from running at once.
 
+## Frontend
+
+The UI is design H ("Rings"), a dark theme.
+
+- **List:** each hackathon is a ring that empties as its registration deadline approaches, with the prize in the middle.
+- **Detail page:** the outer ring is the time left to register and the inner ring is how the prize money splits.
+
+How it behaves:
+
+- **Phone:** tapping a ring slides the detail page in. Swipe right, use the back button, or press Escape to return.
+- **Wide screens (900px+):** the list and the detail page sit side by side.
+- **Links:** every hackathon has its own link, `/h/<id>`, which you can share. `wrangler.jsonc` tells Cloudflare to serve the app for these paths.
+- **Speed:** filtering, sorting and search all happen in the browser, so they respond instantly.
+- **Accessibility:** animations follow the device's "reduce motion" setting.
+
 ## API
 
 - `GET /hackathons`: takes `sort` (`prize` default, `deadline`, `new`, `relevance`), `category` (repeatable), `format`, `min_prize`, `international_ok`, `student_only`, `status` (default `open,upcoming`), `q`, `limit`, `offset`. Returns `{items, total, limit, offset}`.
-- `GET /hackathons/{id}`
+- `GET /hackathons/{id}`: everything in the list plus `description` (the long text) and `prizes` (the breakdown, with each prize's amount per winner and the winner count).
 - `GET /meta`: category counts, last refresh time, and the latest run per source with fetched/new/errors/tokens.
 - `POST /admin/refresh`: needs the `X-Admin-Token` header.
 - `GET /health`

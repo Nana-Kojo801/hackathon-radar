@@ -1,0 +1,10 @@
+// Cloudflare Workers static-assets config. not_found_handling serves index.html for
+// unknown paths, so shared links like /h/<id> open the app instead of a 404.
+{
+  "name": "hackathon-radar",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

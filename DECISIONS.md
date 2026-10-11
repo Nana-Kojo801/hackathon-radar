@@ -89,3 +89,18 @@ A small static FX table (`normalize.FX_TO_USD`) converts INR/EUR/CAD/etc. right 
 
 - **Deployment:** this build environment has no Neon, Render, Cloudflare or GitHub-secrets access. Everything is ready for it: `render.yaml`, `refresh.yml` and the Pages settings in the README.
 - **Real OpenAI/Tavily calls:** no keys were available here. The enrichment and discovery code paths were exercised end-to-end through the real `openai` SDK against a local stand-in server that returns schema-shaped responses. Token and cost numbers in the README are estimates from prompt sizes.
+
+## Detail pages and prize breakdowns (added with the H redesign)
+
+- **The bug:** each refresh, the short Devpost listing text (just the themes) overwrote the long description fetched from the hackathon's own page on the previous run.
+- **The fix:** long descriptions now live in `description_detail` and breakdowns in `prizes`. The listing text can no longer touch them.
+- **The details step:** a separate pipeline step fills those columns. It runs before AI enrichment for listings that are new or changed, or whose page was last fetched over a week ago, up to 80 per run. It costs no AI tokens.
+- **Devpost prizes:** each prize card lists an amount *per winner* plus a winner count. Both are stored, so the parts add up to the stated pool (e.g. 15 winners × €2,000).
+- **Devfolio prizes:** these come from `prizeDetails` on the microsite the adapter already reads.
+
+## Frontend (design H)
+
+- **Animation:** Framer Motion handles springs, layout reflow when sorting or filtering, the gliding selection outline, the bottom sheet and the page push. Ring fills are pure CSS: an animatable `--p` custom property drives a `conic-gradient`.
+- **Routing:** a ~30-line router in `lib/router.ts`, with no react-router. The app has only two routes.
+- **Data:** the list loads once (about 200 rows) and is filtered in the browser, so filtering is instant. The detail endpoint is fetched when a hackathon opens, while the list data already shows the header.
+- **Responsiveness:** phone and desktop are separate layouts, not a scaled-down desktop. On a phone the detail page slides over the list, so returning keeps your scroll position. On desktop it's a split view.
