@@ -95,13 +95,13 @@ TEST_DATABASE_URL=postgresql://postgres:pg@localhost:5432/radar_test python -m p
 
 1. **Neon:** create a project, then copy the **direct** connection string, not the `-pooler` one (in the Connect dialog, turn "Connection pooling" off). It ends with `?sslmode=require`. Tables get created on the first API start or pipeline run.
 2. **Render (API):** go to New → Blueprint and pick this repo. `render.yaml` sets up a free web service from `backend/`. When it asks, fill in `DATABASE_URL`, `ALLOWED_ORIGINS` (add your Pages URL after step 3), plus `OPENAI_API_KEY`/`SEARCH_API_KEY` if you want `/admin/refresh` to work. `ADMIN_TOKEN` is generated for you and you can read it in the service's Environment tab.
-3. **Cloudflare Pages (frontend):** go to Workers & Pages → Create → Pages → Connect to Git and pick this repo. Use these settings:
+3. **Cloudflare (frontend):** go to Workers & Pages → Create and import this repo from Git. Cloudflare's default flow now creates a *Worker* with static assets, and a *Pages* project works just as well. Use these settings:
    - Root directory: `frontend`
    - Build command: `npm run build`
-   - Build output directory: `dist`
-   - Environment variable: `VITE_API_URL=https://<your-render-service>.onrender.com` (and `NODE_VERSION=22` if the build picks an old Node)
+   - Output directory: `dist` (Pages only; a Worker's deploy command `npx wrangler deploy` finds it on its own)
+   - Build-time variable `VITE_API_URL=https://<your-render-service>.onrender.com`, plus `NODE_VERSION=22` if the build picks an old Node. On a Worker this goes under **Settings → Build → Variables and secrets**, not the runtime variables, because Vite bakes it in at build time.
 
-   Then add the resulting `https://<project>.pages.dev` to `ALLOWED_ORIGINS` on Render.
+   Then add the resulting site URL (`https://<project>.pages.dev` or `https://<project>.<you>.workers.dev`) to `ALLOWED_ORIGINS` on Render.
 4. **GitHub Actions (cron):** go to repo Settings → Secrets and variables → Actions and add the secrets `DATABASE_URL`, `OPENAI_API_KEY` and `SEARCH_API_KEY`. You can optionally add the variables `OPENAI_MODEL`, `MAX_ENRICH_PER_RUN` and `MAX_DISCOVERY_PAGES`. The workflow runs every 6 hours.
 5. **First fill:** trigger a manual refresh (see below). The first run stores every listing right away but only enriches 60 of them, so it takes about 4 runs (one day of cron, or a few manual runs) before every listing has an AI summary. Listings that aren't enriched yet still show up with their platform data: prize, dates, format and categories.
 
