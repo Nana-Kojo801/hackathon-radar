@@ -141,7 +141,7 @@ Accounts, saved/bookmarked hackathons, email or Telegram alerts, monetization, p
 
 ## 15. What's been built since v1
 v1 shipped as specced. Additions since, so this spec matches the app:
-- **Sources:** TAIKAI, ETHGlobal, Unstop and HackerEarth adapters (DoraHacks skipped: its firewall blocks non-browser clients). Unstop listings, like web finds, stay hidden until the AI confirms they're hackathons.
+- **Sources:** TAIKAI, ETHGlobal and Unstop adapters. DoraHacks was skipped (its firewall blocks non-browser clients) and HackerEarth removed (it blocks GitHub Actions). Unstop listings, like web finds, stay hidden until the AI confirms they're hackathons.
 - **Detail pages** (`/h/<id>`) with the long description, prize breakdown, key dates, **Add to calendar** (Google Calendar or .ics with a reminder) and **Share** (share sheet or copy link).
 - **List:** NEW badge (first seen in 48h), deadline countdowns, multi-select categories, relevance sort, and a warning banner when a source fails or refreshes stop.
 - **Fast loading:** a static copy of the data is published to GitHub Pages after every refresh, so the site doesn't wait for the sleeping Render API.

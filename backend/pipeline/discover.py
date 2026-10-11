@@ -40,7 +40,7 @@ SOCIAL_DOMAINS = (
 )
 # Covered by dedicated adapters, or not hackathon pages at all.
 SKIP_DOMAINS = ("devpost.com", "devfolio.co", "mlh.io", "mlh.com", "unstop.com", "taikai.network",
-                "ethglobal.com", "hackerearth.com", "medium.com", "quora.com",
+                "ethglobal.com", "medium.com", "quora.com",
                 "wikipedia.org") + SOCIAL_DOMAINS
 
 

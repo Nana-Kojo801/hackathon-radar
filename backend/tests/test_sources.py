@@ -3,7 +3,7 @@
 import json
 from datetime import datetime, timezone
 
-from pipeline.sources import ethglobal, hackerearth, taikai, unstop
+from pipeline.sources import ethglobal, taikai, unstop
 
 NOW = datetime(2026, 10, 11, tzinfo=timezone.utc)
 
@@ -108,14 +108,3 @@ def test_ethglobal_prize_header():
     assert ethglobal.prize_from_event_page(html) == 100000.0
     prizes = 'self.__next_f.push([1,' + json.dumps('{"sponsors":[{"prizeAmount":20000},{"prizeAmount":7500}]}') + '])'
     assert ethglobal.prize_from_prizes_page(prizes) == 27500.0
-
-
-def test_hackerearth_filters_hackathons_that_have_not_ended():
-    base = {"url": "/challenges/hackathon/agentic-banking/", "start": "2026-10-05T14:30:00", "company_name": "Airwallex"}
-    live = hackerearth.to_listing({**base, "title": "Agentic Banking Hackathon", "type": "Hackathon", "end": "2026-11-13T18:29:00"}, now=NOW)
-    assert live.source_url == "https://www.hackerearth.com/challenges/hackathon/agentic-banking/"
-    assert live.end_date.tzinfo is not None and live.registration_deadline == live.end_date
-    named = hackerearth.to_listing({**base, "title": "GoDaddy Inclusive Innovation Hackathon", "type": "Competitive", "end": "2026-11-01T07:30:00"}, now=NOW)
-    assert named is not None
-    assert hackerearth.to_listing({**base, "title": "Weekly Coding Contest", "type": "Competitive", "end": "2026-11-01T07:30:00"}, now=NOW) is None
-    assert hackerearth.to_listing({**base, "title": "Old Hackathon", "type": "Hackathon", "end": "2021-10-31T10:30:00"}, now=NOW) is None

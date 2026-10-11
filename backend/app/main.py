@@ -171,7 +171,10 @@ def meta() -> dict:
         runs = cur.fetchone()
         cur.execute(
             "SELECT DISTINCT ON (source) source, started_at, finished_at, fetched, new, errors,"
-            " error_text, tokens_used FROM source_runs ORDER BY source, started_at DESC"
+            " error_text, tokens_used FROM source_runs"
+            # A source that hasn't run in two days was removed (runs are every 6 hours).
+            " WHERE started_at > now() - interval '2 days'"
+            " ORDER BY source, started_at DESC"
         )
         sources = cur.fetchall()
     for s in sources:

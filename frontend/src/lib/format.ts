@@ -9,7 +9,6 @@ export const SOURCE_NAME: Record<string, string> = {
   unstop: "Unstop",
   taikai: "TAIKAI",
   ethglobal: "ETHGlobal",
-  hackerearth: "HackerEarth",
   web: "the web",
 };
 

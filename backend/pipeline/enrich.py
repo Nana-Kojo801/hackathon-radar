@@ -193,9 +193,11 @@ def run_enrichment(conn, sources: dict[str, Source], limit: int | None = None) -
                 SELECT * FROM hackathons
                 WHERE enriched_hash IS DISTINCT FROM content_hash
                   AND NOT is_hidden AND status <> 'ended' AND enrich_attempts < %s
-                -- Unvetted web/Unstop rows first: they stay hidden from the list until
-                -- enriched, while platform listings are already usable without the AI.
-                ORDER BY (enriched_at IS NULL) DESC, (source = ANY(%s)) DESC,
+                -- New rows first. Among them: web finds (few, and hidden until vetted),
+                -- then the platforms, then Unstop, whose ~250-row backlog would
+                -- otherwise hold up everything else for a day.
+                ORDER BY (enriched_at IS NULL) DESC,
+                         CASE WHEN source = 'unstop' THEN 2 WHEN source = ANY(%s) THEN 0 ELSE 1 END,
                          prize_usd DESC NULLS LAST, first_seen_at DESC
                 LIMIT %s
                 """,
