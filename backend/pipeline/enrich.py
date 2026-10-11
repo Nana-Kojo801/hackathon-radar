@@ -204,7 +204,10 @@ def run_enrichment(conn, sources: dict[str, Source], limit: int | None = None) -
                 SELECT * FROM hackathons
                 WHERE enriched_hash IS DISTINCT FROM content_hash
                   AND NOT is_hidden AND status <> 'ended' AND enrich_attempts < %s
-                ORDER BY (enriched_at IS NULL) DESC, prize_usd DESC NULLS LAST, first_seen_at DESC
+                -- Unvetted web finds first: they stay hidden from the list until enriched,
+                -- while platform listings are already usable without the AI.
+                ORDER BY (enriched_at IS NULL) DESC, (source = 'web') DESC,
+                         prize_usd DESC NULLS LAST, first_seen_at DESC
                 LIMIT %s
                 """,
                 (MAX_ATTEMPTS, limit),

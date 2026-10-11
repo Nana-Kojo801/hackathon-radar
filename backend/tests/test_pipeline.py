@@ -128,3 +128,43 @@ def test_enrichment_failure_is_retried_next_run(conn, monkeypatch):
     assert float(row["prize_usd"]) == 5000  # structured prize beats the AI guess
     assert row["categories"] == ["web"]
     assert row["is_hidden"] is False  # platform listings are never dropped
+
+
+def test_web_duplicates_with_contained_titles_merge(conn):
+    from pipeline.dates import parse_iso
+    from pipeline.run import run_source
+
+    start, end = parse_iso("2026-06-01"), parse_iso("2027-02-28")
+    a = _listing(source="web", source_url="https://decentralizeai.tech/prizes",
+                 title="Decentralize AI Hackathon", prize_usd=None, start_date=start, end_date=end)
+    b = _listing(source="web", source_url="https://decentralizeai.tech",
+                 title="HackerNoon Decentralize AI Hackathon", prize_usd=None, start_date=start, end_date=end)
+    other = _listing(source="web", source_url="https://other.example/ai", title="Decentralize AI Hackathon",
+                     prize_usd=None, start_date=parse_iso("2027-09-01"), end_date=parse_iso("2027-09-03"))
+    assert run_source(conn, Good([a, b, other]))["new"] == 2
+    with conn.cursor() as cur:
+        cur.execute("SELECT source_url, alt_urls FROM hackathons ORDER BY source_url")
+        rows = cur.fetchall()
+    assert rows[0]["source_url"] == "https://decentralizeai.tech/prizes"
+    assert rows[0]["alt_urls"] == ["https://decentralizeai.tech"]
+
+
+def test_unvetted_web_finds_are_hidden_from_the_list(conn, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app import config, db
+    from app.main import app
+    from pipeline.run import run_source
+
+    run_source(conn, Good([_listing(), _listing(source="web", source_url="https://x.example", title="Web Hack")]))
+    monkeypatch.setattr(db, "_pool", None)
+    with TestClient(app) as client:
+        titles = [h["title"] for h in client.get("/hackathons").json()["items"]]
+        assert titles == ["Alpha Hack 2026"]
+        with conn.cursor() as cur:
+            cur.execute("UPDATE hackathons SET enriched_at = now() WHERE source = 'web'")
+        conn.commit()
+        assert len(client.get("/hackathons").json()["items"]) == 2
+    db.pool().close()
+    monkeypatch.setattr(db, "_pool", None)
+    assert config.DATABASE_URL == os.environ["TEST_DATABASE_URL"]

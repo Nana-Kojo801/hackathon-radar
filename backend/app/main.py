@@ -29,6 +29,9 @@ LIST_COLUMNS = """
     first_seen_at, last_seen_at, (enriched_at IS NOT NULL) AS enriched
 """
 
+# Web finds stay hidden until the AI has confirmed they're real hackathons.
+VISIBLE = "NOT is_hidden AND NOT (source = 'web' AND enriched_at IS NULL)"
+
 SORTS = {
     "prize": "prize_usd DESC NULLS LAST, relevance_score DESC NULLS LAST, first_seen_at DESC",
     "deadline": "COALESCE(registration_deadline, start_date, end_date) ASC NULLS LAST, prize_usd DESC NULLS LAST",
@@ -82,7 +85,7 @@ def list_hackathons(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ) -> dict:
-    where = ["NOT is_hidden"]
+    where = [VISIBLE]
     params: dict = {}
 
     statuses = [s for s in _split(status) if s in STATUSES] or ["open", "upcoming"]
@@ -152,11 +155,11 @@ def meta() -> dict:
     with db.cursor() as cur:
         cur.execute(
             "SELECT c AS category, count(*)::int AS count FROM hackathons, unnest(categories) c"
-            " WHERE NOT is_hidden AND status IN ('open', 'upcoming') GROUP BY c"
+            f" WHERE {VISIBLE} AND status IN ('open', 'upcoming') GROUP BY c"
         )
         counts = {r["category"]: r["count"] for r in cur.fetchall()}
         cur.execute(
-            "SELECT count(*)::int AS n FROM hackathons WHERE NOT is_hidden AND status IN ('open', 'upcoming')"
+            f"SELECT count(*)::int AS n FROM hackathons WHERE {VISIBLE} AND status IN ('open', 'upcoming')"
         )
         active = cur.fetchone()["n"]
         cur.execute(

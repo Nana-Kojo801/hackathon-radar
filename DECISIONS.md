@@ -48,6 +48,9 @@ A small static FX table (`normalize.FX_TO_USD`) converts INR/EUR/CAD/etc. right 
 - A title match counts as the same hackathon only if the two sources are different and the dates overlap (with ±2 days of slack). If either side has no dates, the normalized title must be at least 8 characters, so short generic names don't collide.
 - "Richest source" = source priority (Devpost = Devfolio > MLH > web) plus the number of filled fields. A lower-priority source never replaces a platform record. Its URL goes into `alt_urls`, and it can only fill fields that are empty. On today's data, 13 MLH events merged into their Devpost pages this way.
 
+- Web finds also dedupe against *each other* (two pages often describe the same event). With overlapping dates, a title containing another counts as a match, e.g. "HackerNoon Decentralize AI Hackathon" = "Decentralize AI Hackathon". The shorter title must be at least 8 characters.
+- Web finds stay **hidden from the list until the AI has vetted them**, and enrichment handles unvetted web finds before anything else. Platform listings are usable without the AI; unvetted web finds can be blog posts. The first live run showed exactly that.
+
 ## Status
 
 `status` is recomputed from dates on every run. **Registration closed counts as `ended`**: for a discovery tool, an event you can no longer join is over. A row with no dates at all becomes `ended` once no source has seen it for 30 days.

@@ -48,18 +48,38 @@ def find_by_url(cur, url: str) -> dict | None:
 
 
 def find_by_title(cur, n: Normalized) -> dict | None:
-    if not n.title_key:
+    """Same normalized title on another source (web finds also match each other).
+    With overlapping dates, one title containing the other also counts:
+    'HackerNoon Decentralize AI Hackathon' == 'Decentralize AI Hackathon'."""
+    key = n.title_key
+    if not key:
         return None
-    cur.execute(
-        "SELECT * FROM hackathons WHERE title_key = %s AND source <> %s"
-        " ORDER BY last_seen_at DESC LIMIT 5",
-        (n.title_key, n.raw.source),
-    )
     r = n.raw
+    # Platforms list each event once, so two URLs there are two events.
+    # Web finds of the same event often come from different pages.
+    other_source = "(source <> %(source)s OR %(source)s = 'web')"
+    cur.execute(
+        f"SELECT * FROM hackathons WHERE title_key = %(key)s AND {other_source}"
+        " ORDER BY last_seen_at DESC LIMIT 5",
+        {"key": key, "source": r.source},
+    )
     for row in cur.fetchall():
         overlap = dates_overlap(r.start_date, r.end_date, row["start_date"], row["end_date"])
         if overlap is True:
             return row
-        if overlap is None and len(n.title_key) >= MIN_KEY_LEN_WITHOUT_DATES:
+        if overlap is None and len(key) >= MIN_KEY_LEN_WITHOUT_DATES:
+            return row
+
+    if len(key) < MIN_KEY_LEN_WITHOUT_DATES or not (r.start_date or r.end_date):
+        return None
+    cur.execute(
+        f"SELECT * FROM hackathons WHERE {other_source} AND title_key <> %(key)s"
+        " AND length(title_key) >= %(min)s"
+        " AND (strpos(title_key, %(key)s) > 0 OR strpos(%(key)s, title_key) > 0)"
+        " ORDER BY last_seen_at DESC LIMIT 5",
+        {"key": key, "source": r.source, "min": MIN_KEY_LEN_WITHOUT_DATES},
+    )
+    for row in cur.fetchall():
+        if dates_overlap(r.start_date, r.end_date, row["start_date"], row["end_date"]) is True:
             return row
     return None
