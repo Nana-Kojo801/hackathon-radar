@@ -39,6 +39,10 @@ jobs:
           MAX_DISCOVERY_PAGES: ${{ vars.MAX_DISCOVERY_PAGES || '12' }}
           SOURCES: ${{ github.event.inputs.sources }}
         run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::warning::DATABASE_URL secret is not set yet; skipping refresh (see README > Deploy)."
+            exit 0
+          fi
           if [ -n "$SOURCES" ]; then
             python -m pipeline.run --sources "$SOURCES"
           else
