@@ -102,7 +102,7 @@ A small static FX table (`normalize.FX_TO_USD`) converts INR/EUR/CAD/etc. right 
 
 - **Design:** built one-to-one from the Atlantic comps (Discovery and Hackathon Details, desktop and phone). Colors and the 900px desktop breakpoint live as Tailwind v4 `@theme` tokens in `index.css`; the font is Figtree.
 - **Components:** shadcn-style Button, Badge, Select and Sheet on Radix primitives, restyled to the comps rather than shadcn's defaults.
-- **Animation:** Framer Motion for the page transition, staggered list rows, the sliding Cards/Table toggle, the tab underline, section reveals and the expanding description. Radix popovers and the sheet use CSS keyframes.
+- **Animation:** page transitions are a timer plus CSS keyframes (never an animation callback, so a dropped frame cannot leave a blank screen). Framer Motion handles the staggered list rows, the sliding Cards/Table toggle, the tab underline, section reveals and the expanding description. Radix popovers and the sheet use CSS keyframes.
 - **Routing:** a ~30-line router in `lib/router.ts`, with no react-router. The list stays mounted under the detail page so its scroll position and filters survive a round trip.
 - **Data:** the list loads once (about 200 rows) and is filtered and paged in the browser. The detail endpoint is fetched when a hackathon opens, while the list data already fills the header.
 - **Cloudflare:** `wrangler.jsonc` was removed; the Worker created in the dashboard already serves `index.html` for unknown paths.

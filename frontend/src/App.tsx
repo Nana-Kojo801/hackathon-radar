@@ -1,4 +1,4 @@
-import { AnimatePresence, MotionConfig, motion, useAnimate, useReducedMotion } from "framer-motion";
+import { MotionConfig, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { fetchJSON, type Hackathon, type Meta } from "./lib/api";
@@ -12,7 +12,8 @@ interface ListResponse {
   total: number;
 }
 
-const ease = [0.16, 1, 0.3, 1] as const;
+/** Matches .page-leave in index.css. */
+const LEAVE_MS = 170;
 
 // The app restores the list's scroll itself; the browser's own restoration on
 // Back would jump the page before the transition runs.
@@ -64,65 +65,53 @@ export default function App() {
   }, [items]);
 
   // Page transitions run in two steps so the two pages are never on screen
-  // together: the current page fades out, then the next one fades in. The list
-  // stays mounted (hidden) under the detail page, so going back restores its
-  // scroll position and briefly marks the hackathon you came back from.
+  // together: the current page fades out, then the next one fades in. Each step
+  // is a plain timer plus a CSS animation, never an animation callback, so a
+  // dropped frame or a paused tab can't leave the screen blank: if a fade
+  // doesn't run, the page simply shows at full opacity. The list stays mounted
+  // (hidden) under the detail page, so going back restores its scroll position
+  // and briefly marks the hackathon you came back from.
   const reduced = useReducedMotion();
-  const [listScope, animateList] = useAnimate<HTMLDivElement>();
   const [view, setView] = useState<string | null>(routeId); // detail id, or null for the list
-  const [listShown, setListShown] = useState(!routeId);
+  const [leaving, setLeaving] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
   const listScroll = useRef(0);
-  const viewRef = useRef(view);
-  viewRef.current = view;
-  const enterList = useRef(false);
+  const focusSearch = useRef(false);
+  const timer = useRef<number>();
 
   useEffect(() => {
+    window.clearTimeout(timer.current);
     if (routeId === view) {
-      // Back pressed while the list was still fading out: bring it straight back.
-      if (view === null && listScope.current) animateList(listScope.current, { opacity: 1, y: 0 }, { duration: 0.2 });
+      // Navigated back before the fade finished: stay on this page.
+      setLeaving(false);
       return;
     }
-    let cancelled = false;
-    if (view === null) {
-      // List → detail: remember where we were, fade the list out, then show the detail page.
-      listScroll.current = window.scrollY;
-      const done = () => {
-        if (cancelled) return;
-        setListShown(false);
+    if (view === null) listScroll.current = window.scrollY;
+    setLeaving(true);
+    timer.current = window.setTimeout(
+      () => {
+        setLeaving(false);
+        setHighlight(routeId === null ? view : null);
         setView(routeId);
-      };
-      if (reduced || !listScope.current) done();
-      else animateList(listScope.current, { opacity: 0, y: -6 }, { duration: 0.16, ease: "easeIn" }).then(done);
-    } else {
-      // Detail → list (or another detail): AnimatePresence fades the detail page out first.
-      if (routeId === null) setHighlight(view);
-      setView(routeId);
+      },
+      reduced ? 0 : LEAVE_MS,
+    );
+    return () => window.clearTimeout(timer.current);
+  }, [routeId, view, reduced]);
+
+  useLayoutEffect(() => {
+    if (view !== null) {
+      window.scrollTo(0, 0);
+      return;
     }
-    return () => {
-      cancelled = true;
-    };
-  }, [routeId, view, reduced, animateList, listScope]);
-
-  const onDetailExited = useCallback(() => {
-    if (viewRef.current !== null) return;
-    enterList.current = true;
-    setListShown(true);
-  }, []);
-
-  useLayoutEffect(() => {
-    if (view !== null) window.scrollTo(0, 0);
-  }, [view]);
-
-  useLayoutEffect(() => {
-    if (!listShown || !enterList.current) return;
-    enterList.current = false;
     window.scrollTo(0, listScroll.current);
-    if (listScope.current) {
-      if (reduced) listScope.current.style.cssText = "";
-      else animateList(listScope.current, { opacity: [0, 1], y: [10, 0] }, { duration: 0.34, ease: [0.16, 1, 0.3, 1] });
+    if (focusSearch.current) {
+      focusSearch.current = false;
+      const input = document.querySelector<HTMLInputElement>("#discovery-search");
+      input?.focus();
+      input?.setSelectionRange(input.value.length, input.value.length);
     }
-  }, [listShown, reduced, animateList, listScope]);
+  }, [view]);
 
   useEffect(() => {
     if (!highlight) return;
@@ -134,15 +123,10 @@ export default function App() {
     (q: string) => {
       setFilters({ ...filters, q });
       setPage(1);
-      listScroll.current = 0;
-      setHighlight(null);
-      navigate("/");
       // Keep typing in the list's search box, which shows the results live.
-      requestAnimationFrame(() => {
-        const input = document.querySelector<HTMLInputElement>("#discovery-search");
-        input?.focus();
-        input?.setSelectionRange(q.length, q.length);
-      });
+      focusSearch.current = true;
+      navigate("/");
+      listScroll.current = 0;
     },
     [filters, setFilters],
   );
@@ -153,7 +137,7 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen bg-canvas wide:px-4 wide:py-4">
         <div className="relative mx-auto min-h-screen max-w-[1220px] overflow-clip bg-white wide:min-h-[calc(100vh-2rem)] wide:rounded-[10px] wide:border wide:border-line wide:shadow-[0_1px_2px_rgba(10,16,51,0.04)]">
-          <div ref={listScope} hidden={!listShown}>
+          <div hidden={view !== null} className={view === null ? (leaving ? "page-leave" : "page-enter") : undefined}>
             <Discovery
               items={visible}
               totalCount={items.length}
@@ -170,25 +154,18 @@ export default function App() {
               highlightId={highlight}
             />
           </div>
-          <AnimatePresence mode="wait" initial={false} onExitComplete={onDetailExited}>
-            {view && (
-              <motion.div
-                key={view}
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0, transition: { duration: 0.38, ease } }}
-                exit={{ opacity: 0, y: 8, transition: { duration: 0.18, ease: "easeIn" } }}
-              >
-                <Details
-                  id={view}
-                  initial={items.find((h) => h.id === view)}
-                  totalCount={items.length || meta?.active_count || 0}
-                  lastRefresh={lastRefresh}
-                  query=""
-                  onSearch={onDetailSearch}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {view && (
+            <div key={view} className={leaving ? "page-leave" : "page-enter-fade"}>
+              <Details
+                id={view}
+                initial={items.find((h) => h.id === view)}
+                totalCount={items.length || meta?.active_count || 0}
+                lastRefresh={lastRefresh}
+                query=""
+                onSearch={onDetailSearch}
+              />
+            </div>
+          )}
         </div>
       </div>
     </MotionConfig>
