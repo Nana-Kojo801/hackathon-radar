@@ -172,7 +172,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
   const countdown = closesIn(h);
   const cal = <CalendarDays className="h-[21px] w-[21px] text-orange" strokeWidth={1.9} />;
   const eligPill = <Badge tone={elig.tone}>{elig.text}</Badge>;
-  const catPill = cat ? <Badge tone="blue">{categoryLabel(cat)}</Badge> : <span className="text-[16px] text-body">Not tagged</span>;
+  const catPill = cat ? <Badge tone="blue">{categoryLabel(cat)}</Badge> : <span className="text-[16px] whitespace-nowrap text-body">Not tagged</span>;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} className="pb-28 wide:pb-12">
@@ -370,7 +370,10 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
                   <span className="text-[16.5px] font-medium text-ink">{FORMAT_LABEL[h.format]}</span>
                 </SideRow>
                 <SideRow label="Eligibility" icon={globe}>
-                  {eligPill}
+                  {/* The sidebar is narrow: let a long label wrap inside the pill. */}
+                  <Badge tone={elig.tone} className="h-auto min-h-[30px] py-1 leading-snug whitespace-normal">
+                    {elig.text}
+                  </Badge>
                 </SideRow>
                 <SideRow label="Category" icon={tag} last>
                   {catPill}

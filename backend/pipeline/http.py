@@ -72,5 +72,14 @@ class PoliteClient:
         r.raise_for_status()
         return r
 
+    def post(self, url: str, check_robots: bool = True, **kw) -> httpx.Response:
+        """For read-only JSON/GraphQL APIs that take their query in a POST body."""
+        if check_robots and not self.allowed(url):
+            raise RobotsDisallowed(url)
+        self._wait(self._site(url))
+        r = self.client.post(url, **kw)
+        r.raise_for_status()
+        return r
+
     def close(self) -> None:
         self.client.close()

@@ -1,6 +1,6 @@
 # Hackathon Radar
 
-A personal hackathon finder. It pulls hackathons from Devpost, MLH, Devfolio and the open web, runs a cheap AI pass over each one, and shows them in a single list sorted by prize money. Each card links out to the original page so you can register there.
+A personal hackathon finder. It pulls hackathons from Devpost, Devfolio, MLH, TAIKAI, ETHGlobal, Unstop, HackerEarth and the open web, runs a cheap AI pass over each one, and shows them in a single list sorted by prize money. Each card links out to the original page so you can register there.
 
 ```
 GitHub Actions (cron, every 6h)
@@ -18,7 +18,7 @@ backend/
   app/            FastAPI app: main.py (routes), db.py (pool + migrations), config.py
   migrations/     plain SQL, applied in order (python -m app.db)
   pipeline/
-    sources/      one adapter per site: devpost.py, devfolio.py, mlh.py
+    sources/      one adapter per site: devpost, devfolio, mlh, taikai, ethglobal, unstop, hackerearth
     discover.py   web discovery (Tavily search -> page fetch -> AI extraction)
     normalize.py  URL canonicalisation, title keys, content hash, money parsing
     dedupe.py     cross-source matching (same URL, or same title + overlapping dates)

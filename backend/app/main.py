@@ -8,7 +8,7 @@ from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import config, db
-from .categories import CATEGORIES, STATUSES
+from .categories import CATEGORIES, STATUSES, VETTED_SOURCES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("api")
@@ -29,8 +29,9 @@ LIST_COLUMNS = """
     first_seen_at, last_seen_at, (enriched_at IS NOT NULL) AS enriched
 """
 
-# Web finds stay hidden until the AI has confirmed they're real hackathons.
-VISIBLE = "NOT is_hidden AND NOT (source = 'web' AND enriched_at IS NULL)"
+# Web finds and Unstop listings stay hidden until the AI has confirmed they're real hackathons.
+_VETTED = ", ".join(f"'{s}'" for s in VETTED_SOURCES)
+VISIBLE = f"NOT is_hidden AND NOT (source IN ({_VETTED}) AND enriched_at IS NULL)"
 
 SORTS = {
     "prize": "prize_usd DESC NULLS LAST, relevance_score DESC NULLS LAST, first_seen_at DESC",

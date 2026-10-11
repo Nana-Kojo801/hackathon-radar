@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from .normalize import Normalized
 
 # Higher = richer, structured data. Used to break ties in richness().
-SOURCE_PRIORITY = {"devpost": 3, "devfolio": 3, "mlh": 2, "web": 1}
+SOURCE_PRIORITY = {"devpost": 3, "devfolio": 3, "taikai": 3, "ethglobal": 3, "unstop": 2, "mlh": 2, "hackerearth": 2, "web": 1}
 
 # Titles shorter than this are too generic to match without dates.
 MIN_KEY_LEN_WITHOUT_DATES = 8

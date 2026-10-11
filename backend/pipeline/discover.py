@@ -39,7 +39,8 @@ SOCIAL_DOMAINS = (
     "reddit.com", "tiktok.com", "discord.gg", "discord.com", "t.me", "wa.me",
 )
 # Covered by dedicated adapters, or not hackathon pages at all.
-SKIP_DOMAINS = ("devpost.com", "devfolio.co", "mlh.io", "mlh.com", "medium.com", "quora.com",
+SKIP_DOMAINS = ("devpost.com", "devfolio.co", "mlh.io", "mlh.com", "unstop.com", "taikai.network",
+                "ethglobal.com", "hackerearth.com", "medium.com", "quora.com",
                 "wikipedia.org") + SOCIAL_DOMAINS
 
 

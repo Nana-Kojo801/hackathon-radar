@@ -6,6 +6,13 @@ def all_sources() -> list[Source]:
     from ..discover import WebDiscoverySource
     from .devfolio import DevfolioSource
     from .devpost import DevpostSource
+    from .ethglobal import ETHGlobalSource
+    from .hackerearth import HackerEarthSource
     from .mlh import MLHSource
+    from .taikai import TaikaiSource
+    from .unstop import UnstopSource
 
-    return [DevpostSource(), DevfolioSource(), MLHSource(), WebDiscoverySource()]
+    return [
+        DevpostSource(), DevfolioSource(), TaikaiSource(), ETHGlobalSource(), MLHSource(),
+        UnstopSource(), HackerEarthSource(), WebDiscoverySource(),
+    ]

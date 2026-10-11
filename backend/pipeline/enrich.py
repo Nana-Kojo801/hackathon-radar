@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 from app import config
-from app.categories import CATEGORIES
+from app.categories import CATEGORIES, VETTED_SOURCES
 
 from . import ai
 from .dates import parse_iso
@@ -24,8 +24,8 @@ log = logging.getLogger(__name__)
 
 DESC_LIMIT = 2000
 MAX_ATTEMPTS = 4
-# Trust the big platforms on "is this a hackathon"; only web finds can be dropped.
-DROPPABLE_SOURCES = {"web"}
+# Trust the big platforms on "is this a hackathon"; only vetted sources can be dropped.
+DROPPABLE_SOURCES = set(VETTED_SOURCES)
 
 SCHEMA = {
     "type": "object",
@@ -193,13 +193,13 @@ def run_enrichment(conn, sources: dict[str, Source], limit: int | None = None) -
                 SELECT * FROM hackathons
                 WHERE enriched_hash IS DISTINCT FROM content_hash
                   AND NOT is_hidden AND status <> 'ended' AND enrich_attempts < %s
-                -- Unvetted web finds first: they stay hidden from the list until enriched,
-                -- while platform listings are already usable without the AI.
-                ORDER BY (enriched_at IS NULL) DESC, (source = 'web') DESC,
+                -- Unvetted web/Unstop rows first: they stay hidden from the list until
+                -- enriched, while platform listings are already usable without the AI.
+                ORDER BY (enriched_at IS NULL) DESC, (source = ANY(%s)) DESC,
                          prize_usd DESC NULLS LAST, first_seen_at DESC
                 LIMIT %s
                 """,
-                (MAX_ATTEMPTS, limit),
+                (MAX_ATTEMPTS, VETTED_SOURCES, limit),
             )
             rows = cur.fetchall()
         conn.commit()

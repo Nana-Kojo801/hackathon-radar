@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       sources:
-        description: "Comma-separated sources to run (blank = all): devpost,devfolio,mlh,web"
+        description: "Comma-separated sources to run (blank = all): devpost,devfolio,mlh,taikai,ethglobal,unstop,hackerearth,web"
         required: false
         default: ""
 
