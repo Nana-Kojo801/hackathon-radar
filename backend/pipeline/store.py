@@ -158,9 +158,11 @@ def _merge_secondary(cur, row: dict, n: Normalized) -> None:
 
 def upsert(cur, n: Normalized) -> str:
     """Returns 'new', 'updated' or 'merged'."""
+    prio = dedupe.SOURCE_PRIORITY.get(n.raw.source, 0)
     row = dedupe.find_by_url(cur, n.source_url)
     if row:
-        if row["source_url"] == n.source_url:
+        own = row["source"] == n.raw.source or prio > dedupe.SOURCE_PRIORITY.get(row["source"], 0)
+        if row["source_url"] == n.source_url and own:
             _update_primary(cur, row, n)
             return "updated"
         _merge_secondary(cur, row, n)
@@ -169,7 +171,9 @@ def upsert(cur, n: Normalized) -> str:
     row = dedupe.find_by_title(cur, n)
     if row:
         existing = {**row, "description": row["description_raw"]}
-        if dedupe.richness(_fields(n)) > dedupe.richness(existing):
+        # A poorer source (e.g. a web find) never replaces a platform record.
+        if (prio >= dedupe.SOURCE_PRIORITY.get(row["source"], 0)
+                and dedupe.richness(_fields(n)) > dedupe.richness(existing)):
             # The new source is richer: it becomes the primary record.
             cur.execute(
                 "UPDATE hackathons SET alt_urls = array_append(array_remove(alt_urls, source_url), source_url)"

@@ -72,5 +72,8 @@ CREATE TABLE IF NOT EXISTS discovered_pages (
     url          text PRIMARY KEY,
     content_hash text NOT NULL,
     found        int NOT NULL DEFAULT 0,
-    extracted_at timestamptz NOT NULL DEFAULT now()
+    -- what the AI extracted; unchanged pages re-emit these for free
+    listings     jsonb NOT NULL DEFAULT '[]'::jsonb,
+    extracted_at timestamptz NOT NULL DEFAULT now(),
+    last_seen_at timestamptz NOT NULL DEFAULT now()
 );
