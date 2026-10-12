@@ -48,3 +48,14 @@ jobs:
           else
             python -m pipeline.run
           fi
+      - name: Email alerts, reminders and digest
+        if: ${{ !cancelled() }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
+          NOTIFY_FROM: ${{ vars.NOTIFY_FROM }}
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then exit 0; fi
+          python -m app.notify

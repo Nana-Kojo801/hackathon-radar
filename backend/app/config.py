@@ -19,6 +19,12 @@ SEARCH_API_KEY = os.getenv("SEARCH_API_KEY", "")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 # Unlocks the personal /me endpoints (saved hackathons, notes, email settings).
 PERSONAL_KEY = os.getenv("PERSONAL_KEY", "") or ADMIN_TOKEN
+# Email notifications (app/notify.py), sent with Resend.
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+NOTIFY_EMAIL = os.getenv("NOTIFY_EMAIL", "")
+NOTIFY_FROM = os.getenv("NOTIFY_FROM", "") or "Hackathon Radar <onboarding@resend.dev>"
+# Where links in emails point.
+APP_URL = (os.getenv("APP_URL", "") or "https://hackathon-radar.nkabenyah.workers.dev").rstrip("/")
 MAX_ENRICH_PER_RUN = _int("MAX_ENRICH_PER_RUN", 60)
 MAX_DISCOVERY_PAGES = _int("MAX_DISCOVERY_PAGES", 12)
 ALLOWED_ORIGINS = [
