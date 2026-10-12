@@ -71,9 +71,9 @@ export function Details({ id, initial, totalCount, lastRefresh, query, onSearch 
   const h: Hackathon | undefined = detail ?? initial;
 
   useEffect(() => {
-    if (h) document.title = `${h.title} · Hackscout`;
+    if (h) document.title = `${h.title} · Hackathon Radar`;
     return () => {
-      document.title = "Hackscout";
+      document.title = "Hackathon Radar";
     };
   }, [h]);
 

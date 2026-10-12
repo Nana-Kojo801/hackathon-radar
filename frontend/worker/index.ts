@@ -31,7 +31,7 @@ declare const HTMLRewriter: {
   };
 };
 
-const SITE = "Hackscout";
+const SITE = "Hackathon Radar";
 const SITE_DESCRIPTION = "Every open hackathon from Devpost, Devfolio, MLH, TAIKAI, ETHGlobal, Unstop and the web, ranked by prize.";
 const DETAIL = /^\/h\/([0-9a-f-]{36})\/?$/i;
 

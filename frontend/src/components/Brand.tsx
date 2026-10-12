@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { navigate } from "../lib/router";
 import { cn } from "../lib/utils";
 
-/** Hackscout's mark: a compass, its needle's north half in orange. */
+/** The logo: a compass, its needle's north half in orange. */
 export function Logo({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 48 48" className={cn("h-8 w-8 wide:h-9 wide:w-9", className)} aria-hidden="true">
@@ -25,10 +25,10 @@ export function BrandLink() {
         navigate("/");
       }}
       className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-teal/40"
-      aria-label="Hackscout, all hackathons"
+      aria-label="Hackathon Radar, all hackathons"
     >
       <Logo />
-      <span className="text-[19px] font-semibold wide:text-[21px] tracking-[-0.01em] text-ink">Hackscout</span>
+      <span className="text-[19px] font-semibold wide:text-[21px] tracking-[-0.01em] text-ink">Hackathon Radar</span>
     </a>
   );
 }

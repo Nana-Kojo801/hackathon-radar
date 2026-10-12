@@ -99,11 +99,11 @@ function fold(line: string): string {
 
 export function icsFile(h: Hackathon, events: CalendarEvent[]): string {
   const now = stamp(new Date(), false);
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Hackscout//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Hackathon Radar//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
   for (const ev of events) {
     lines.push(
       "BEGIN:VEVENT",
-      `UID:${h.id}-${ev.kind}@hackscout`,
+      `UID:${h.id}-${ev.kind}@hackathon-radar`,
       `DTSTAMP:${now}`,
       ev.allDay ? `DTSTART;VALUE=DATE:${stamp(ev.start, true)}` : `DTSTART:${stamp(ev.start, false)}`,
       ev.allDay ? `DTEND;VALUE=DATE:${stamp(ev.end, true)}` : `DTEND:${stamp(ev.end, false)}`,

@@ -25,4 +25,4 @@ ALLOWED_ORIGINS = [
     if o.strip()
 ]
 
-USER_AGENT = "Hackscout/1.0 (personal hackathon aggregator; +https://github.com/nana-kojo801/hackathon-radar)"
+USER_AGENT = "HackathonRadar/1.0 (personal hackathon aggregator; +https://github.com/nana-kojo801/hackathon-radar)"

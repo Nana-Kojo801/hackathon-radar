@@ -1,6 +1,4 @@
-# Hackscout — Spec
-
-*Written as "Hackathon Radar" (the working title). Renamed to Hackscout on 2026-10-11 because another platform already uses that name.*
+# Hackathon Radar — Spec
 
 ## 1. What it is
 A personal discovery tool that finds hackathons from many platforms and the open web, puts them in one list, and sorts by prize money first. It does NOT host hackathons. Every card links out to the original page where you register.

@@ -4,7 +4,7 @@ import { CalendarPlus, Check, Download, Share2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import type { Hackathon } from "../lib/api";
-import { calendarEvents, downloadIcs, googleCalendarUrl, pageUrl } from "../lib/calendar";
+import { calendarEvents, downloadIcs, googleCalendarUrl } from "../lib/calendar";
 import { deadlineLabel, prizeText } from "../lib/format";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
@@ -76,7 +76,10 @@ export function CalendarButton({ h, className }: { h: Hackathon; className?: str
   );
 }
 
-/** Phones get the system share sheet; elsewhere the link is copied. */
+/**
+ * Shares the hackathon's own page (Devpost, Devfolio, ...), not this app's: the
+ * app is personal. Phones get the system share sheet; elsewhere the link is copied.
+ */
 export function ShareButton({ h, className }: { h: Hackathon; className?: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -87,7 +90,7 @@ export function ShareButton({ h, className }: { h: Hackathon; className?: string
   }, [copied]);
 
   const share = async () => {
-    const url = pageUrl(h);
+    const url = h.source_url;
     const touch = window.matchMedia("(pointer: coarse)").matches;
     if (touch && typeof navigator.share === "function") {
       try {
@@ -128,7 +131,7 @@ export function ShareButton({ h, className }: { h: Hackathon; className?: string
  *   ETHGlobal Mumbai
  *   $157,500 USD prize pool · Closes in 23 days
  *
- *   https://…/h/<id>
+ *   https://ethglobal.com/events/mumbai
  */
 export function shareMessage(h: Hackathon, url: string): string {
   const prize = h.prize_usd ? `${prizeText(h)} prize pool` : prizeText(h);
