@@ -1,11 +1,12 @@
 import * as Popover from "@radix-ui/react-popover";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarPlus, Check, Download, Share2 } from "lucide-react";
+import { ArrowUpRight, CalendarPlus, Check, Download, Share2, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import type { Hackathon } from "../lib/api";
+import type { Hackathon, HackathonDetail } from "../lib/api";
 import { calendarEvents, downloadIcs, googleCalendarUrl } from "../lib/calendar";
 import { deadlineLabel, prizeText } from "../lib/format";
+import { claudeUrl, ideasPrompt } from "../lib/prompt";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 
@@ -138,6 +139,56 @@ export function shareMessage(h: Hackathon, url: string): string {
   const deadline = deadlineLabel(h);
   const details = [prize, deadline && deadline.tone === "red" ? deadline.text : null].filter(Boolean).join(" · ");
   return `${h.title}\n${details}\n\n${url}`;
+}
+
+/**
+ * "Copy prompt" and "Open in Claude": a brief asking Claude for project ideas,
+ * built from everything known about the hackathon. Open in Claude is a plain
+ * link (so phones don't block it as a pop-up) that also copies the prompt, in
+ * case Claude doesn't fill it in.
+ */
+export function ClaudeActions({ detail, className }: { detail: HackathonDetail | null; className?: string }) {
+  const prompt = useMemo(() => (detail ? ideasPrompt(detail) : ""), [detail]);
+  const [done, setDone] = useState<"copied" | "opened" | null>(null);
+
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(() => setDone(null), 2500);
+    return () => clearTimeout(t);
+  }, [done]);
+
+  const ready = !!detail;
+  return (
+    <div className={cn("grid grid-cols-2 gap-2.5", className)}>
+      <Button
+        variant="outline"
+        disabled={!ready}
+        onClick={async () => {
+          if (await copy(prompt)) setDone("copied");
+        }}
+        className={cn(actionClass, done === "copied" && "border-[#bfe5cc] bg-pill-green-bg text-pill-green")}
+        title="Copies a prompt asking Claude for project ideas"
+      >
+        {done === "copied" ? <Check className="h-[18px] w-[18px]" strokeWidth={2.4} /> : <Sparkles className="h-[18px] w-[18px] text-teal" strokeWidth={2} />}
+        {done === "copied" ? "Prompt copied" : "Copy prompt"}
+      </Button>
+      <Button asChild variant="outline" className={cn(actionClass, !ready && "pointer-events-none opacity-50")}>
+        <a
+          href={ready ? claudeUrl(prompt) : undefined}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-disabled={!ready}
+          onClick={() => {
+            void copy(prompt);
+            setDone("opened");
+          }}
+        >
+          {done === "opened" ? "Prompt copied" : "Open in Claude"}
+          <ArrowUpRight className="h-[18px] w-[18px] text-teal" strokeWidth={2} />
+        </a>
+      </Button>
+    </div>
+  );
 }
 
 async function copy(text: string): Promise<boolean> {

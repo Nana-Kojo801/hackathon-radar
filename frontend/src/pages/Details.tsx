@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowUpRight, CalendarDays, CalendarRange, Globe, MapPin, Monitor, Shuffle, Tag } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-import { CalendarButton, ShareButton } from "../components/Actions";
+import { CalendarButton, ClaudeActions, ShareButton } from "../components/Actions";
 import { SearchField, TopBar } from "../components/Brand";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -275,6 +275,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
           <CalendarButton h={h} />
           <ShareButton h={h} />
         </div>
+        <ClaudeActions detail={detail} className="mt-2.5 wide:hidden" />
 
         <Tabs />
 
@@ -365,6 +366,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
                 <CalendarButton h={h} className="h-10 text-[14.5px]" />
                 <ShareButton h={h} className="h-10 text-[14.5px]" />
               </div>
+              <ClaudeActions detail={detail} className="mt-2.5 [&>*]:h-10 [&>*]:text-[14.5px]" />
               <dl className="mt-4">
                 <SideRow label="Format" icon={formatIcon}>
                   <span className="text-[16.5px] font-medium text-ink">{FORMAT_LABEL[h.format]}</span>
