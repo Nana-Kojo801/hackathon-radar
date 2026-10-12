@@ -16,7 +16,7 @@ def conn(monkeypatch):
     c = db.connect()
     db.migrate(c)
     with c.cursor() as cur:
-        cur.execute("TRUNCATE hackathons, source_runs, discovered_pages")
+        cur.execute("TRUNCATE hackathons, source_runs, discovered_pages CASCADE")
     c.commit()
     yield c
     c.close()

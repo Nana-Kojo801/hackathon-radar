@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import config, db
+from . import config, db, personal
 from .categories import CATEGORIES, STATUSES, VETTED_SOURCES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -17,9 +17,11 @@ app = FastAPI(title="Hackathon Radar API", version="1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.ALLOWED_ORIGINS,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT"],
     allow_headers=["*"],
 )
+
+app.include_router(personal.router)
 
 LIST_COLUMNS = """
     id, source, source_url, alt_urls, title, organizer, summary, image_url,
