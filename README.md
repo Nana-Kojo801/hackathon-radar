@@ -41,6 +41,11 @@ DECISIONS.md      choices that differ from (or fill gaps in) the spec
 | `OPENAI_MODEL` | optional | default `gpt-4o-mini`. `gpt-4.1-nano` or `gpt-5-nano` also work |
 | `SEARCH_API_KEY` | GitHub secret (Render too if you use `/admin/refresh`) | [Tavily](https://tavily.com) key, free tier is 1,000 searches/month |
 | `ADMIN_TOKEN` | Render | protects `POST /admin/refresh` |
+| `PERSONAL_KEY` | Render | unlocks your personal data (saved hackathons, notes, email settings); each device enters it once in Settings. Falls back to `ADMIN_TOKEN` if unset |
+| `RESEND_API_KEY` | GitHub secret | [Resend](https://resend.com) API key, for the email alerts |
+| `NOTIFY_EMAIL` | GitHub secret | where the emails go |
+| `NOTIFY_FROM` | optional GitHub variable | default `Hackathon Radar <onboarding@resend.dev>`, which can only send to your Resend account's own address |
+| `APP_URL` | optional GitHub variable | where links in emails point; default the workers.dev URL |
 | `MAX_ENRICH_PER_RUN` | optional | default 60 AI calls per run |
 | `MAX_DISCOVERY_PAGES` | optional | default 12 web pages sent to the AI per run |
 | `ALLOWED_ORIGINS` | Render | comma-separated, e.g. `https://hackathon-radar.pages.dev,http://localhost:5173` |
@@ -103,8 +108,10 @@ TEST_DATABASE_URL=postgresql://postgres:pg@localhost:5432/radar_test python -m p
 
    Then add the resulting site URL (`https://<project>.pages.dev` or `https://<project>.<you>.workers.dev`) to `ALLOWED_ORIGINS` on Render.
 4. **GitHub Actions (cron):** go to repo Settings → Secrets and variables → Actions and add the secrets `DATABASE_URL`, `OPENAI_API_KEY` and `SEARCH_API_KEY`. You can optionally add the variables `OPENAI_MODEL`, `MAX_ENRICH_PER_RUN` and `MAX_DISCOVERY_PAGES`. The workflow runs every 6 hours.
-5. **GitHub Pages (fast loading):** go to repo Settings → Pages → Build and deployment and set **Source** to **GitHub Actions**. After each refresh, the *Publish data snapshot* workflow puts a static copy of the data there (see [Fast loading](#fast-loading)). If you skip this, the site still works but waits for the API to wake up.
-6. **First fill:** trigger a manual refresh (see below). The first run stores every listing right away but only enriches 60 of them, so it takes about 4 runs (one day of cron, or a few manual runs) before every listing has an AI summary. Listings that aren't enriched yet still show up with their platform data: prize, dates, format and categories.
+5. **Personal key:** on Render, add `PERSONAL_KEY` to the API's environment: any long random string (a password manager can make one). Then open the app's **Settings** on each device and paste it once.
+6. **Emails (optional):** create a free [Resend](https://resend.com) account, make an API key, and add the GitHub secrets `RESEND_API_KEY` and `NOTIFY_EMAIL` (the address you signed up to Resend with, when using the default sender). Check it with Actions → *Send test email* → *Run workflow*.
+7. **GitHub Pages (fast loading):** go to repo Settings → Pages → Build and deployment and set **Source** to **GitHub Actions**. After each refresh, the *Publish data snapshot* workflow puts a static copy of the data there (see [Fast loading](#fast-loading)). If you skip this, the site still works but waits for the API to wake up.
+8. **First fill:** trigger a manual refresh (see below). The first run stores every listing right away but only enriches 60 of them, so it takes about 4 runs (one day of cron, or a few manual runs) before every listing has an AI summary. Listings that aren't enriched yet still show up with their platform data: prize, dates, format and categories.
 
 Note: GitHub pauses scheduled workflows in repos with no activity for 60 days. If that happens, re-enable the workflow from the Actions tab.
 
@@ -133,6 +140,25 @@ How it behaves:
 - **Going back** returns you to the same place in the list, with your filters kept.
 - **Speed:** filtering, sorting and search all happen in the browser, so they respond instantly.
 - **Accessibility:** animations follow the device's "reduce motion" setting.
+
+## Personal features
+
+The app is for one person, so there are no accounts. Your personal data lives in Neon behind the personal key (`PERSONAL_KEY`), which each device enters once in **Settings**. Your phone and laptop share it.
+
+- **Install it:** on a phone, open the site and use *Add to Home Screen* (iPhone: Share → Add to Home Screen; Android/Chrome: menu → Install app). On a laptop, Chrome or Edge shows an install icon in the address bar. It opens without browser bars and works offline with the data it last loaded.
+- **Track hackathons:** on a hackathon's page, **Save** it, then set its stage (Interested, Registered, Submitted, Won, Didn't place) and keep **notes**. **Not interested** hides it from the list. **My hackathons** (the bookmark in the top bar) groups them by stage. Changes show at once and sync in the background, since the free API can take a minute to wake.
+- **Ask Claude for ideas:** **Copy prompt** copies a brief with everything known about the hackathon (dates, prizes, themes, rules, the organizer's description) asking Claude for project ideas tailored to you. **Open in Claude** also opens Claude with it filled in. That uses claude.ai's `?q=` parameter, which isn't documented, so the prompt is copied too in case it doesn't fill in.
+- **Share** sends the hackathon's own page (Devpost, Devfolio, ...), not this app's link.
+
+## Emails
+
+`python -m app.notify` runs after every refresh (the last step of the *Refresh hackathons* workflow) and sends, via Resend, whatever you've switched on in **Settings**:
+
+- **New hackathon alerts:** hackathons that appeared since the last check and match your rules (minimum prize, categories, formats, international only, skip student-only). One email per refresh, only when something matches. The very first run just records a starting point.
+- **Closing soon:** for hackathons marked Interested or Registered, once, a set number of days before registration closes.
+- **Weekly digest:** Monday mornings (UTC): the week's best matches and your deadlines for the next 7 days.
+
+`python -m app.notify --dry-run` prints what would be sent without sending or recording anything. Without `RESEND_API_KEY` and `NOTIFY_EMAIL` the step skips with a warning.
 
 ## Fast loading
 

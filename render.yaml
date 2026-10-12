@@ -22,6 +22,8 @@ services:
         sync: false
       - key: ADMIN_TOKEN
         generateValue: true
+      - key: PERSONAL_KEY
+        sync: false
       - key: OPENAI_MODEL
         value: gpt-4o-mini
       - key: MAX_ENRICH_PER_RUN

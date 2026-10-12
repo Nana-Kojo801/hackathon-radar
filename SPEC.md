@@ -142,24 +142,18 @@ Accounts, saved/bookmarked hackathons, email or Telegram alerts, monetization, p
 ## 15. What's been built since v1
 v1 shipped as specced. Additions since, so this spec matches the app:
 - **Sources:** TAIKAI, ETHGlobal and Unstop adapters. DoraHacks was skipped (its firewall blocks non-browser clients) and HackerEarth removed (it blocks GitHub Actions). Unstop listings, like web finds, stay hidden until the AI confirms they're hackathons.
-- **Detail pages** (`/h/<id>`) with the long description, prize breakdown, key dates, **Add to calendar** (Google Calendar or .ics with a reminder) and **Share** (share sheet or copy link).
+- **Detail pages** (`/h/<id>`) with the long description, prize breakdown, key dates, **Add to calendar** (Google Calendar or .ics with a reminder) and **Share** (the hackathon's own page, via the share sheet or copied).
 - **List:** NEW badge (first seen in 48h), deadline countdowns, multi-select categories, relevance sort, and a warning banner when a source fails or refreshes stop.
 - **Fast loading:** a static copy of the data is published to GitHub Pages after every refresh, so the site doesn't wait for the sleeping Render API.
 - **Design:** the "Atlantic" UI (light theme, Figtree), desktop and phone layouts.
 
-## 16. Phase 2: from personal tool to multi-user (planned, not started)
-v1 is single-user with no accounts. Phase 2 opens it to other people, and brings in the personal features that only make sense with accounts. It's a phase of its own and gets planned before any of it is built.
+## 16. Phase 2: a personal tool (built)
+The plan for a multi-user Phase 2 was dropped: the app stays personal. No sign-ups, no accounts and no locked site; the link just isn't shared. The features that would have needed accounts were built for one person instead:
 
-Scope to plan:
-- **Sign-up and sign-in.** Pick an auth approach that stays on free tiers (e.g. email magic links or OAuth through a hosted auth provider), and a users table in Neon.
-- **Saved hackathons.** Star a hackathon and see your saved list on any device.
-- **"My entries" tracker.** Per hackathon: interested, registered, submitted, result. With deadline reminders for the ones you're in.
-- **Alerts.** Telegram (or email) when a new hackathon matches your saved filters, e.g. over a prize threshold. Runs after each refresh.
-- **Per-user preferences.** Filters, categories and alert settings stored on the account instead of in the browser.
-- **Public read-only version.** The list and detail pages stay usable without an account.
+- **Installable app (PWA)** for phone and laptop, working offline with the last data.
+- **Saved hackathons and an entries tracker:** Interested, Registered, Submitted, Won, Didn't place; notes; "Not interested" to hide one; a My hackathons page. Stored in Neon behind a personal key each device enters once, synced between devices.
+- **Email via Resend:** new-hackathon alerts for saved rules (prize, categories, format, international, student-only), closing-soon reminders for tracked hackathons, and a Monday digest.
+- **Copy prompt / Open in Claude** on each hackathon: a brief for project ideas. The AI already knows the person, so there's no profile in the app.
+- **Share** sends the hackathon's own page, not the app's.
 
-Questions to settle before building:
-- Hosting limits: the free Render API sleeps and the GitHub Pages snapshot is shared and public. Personal data needs an always-reachable, authenticated API (or a serverless option on Cloudflare).
-- Cost: OpenAI spend doesn't grow with users (enrichment is per hackathon, not per user), but alerts, auth and any always-on hosting might.
-- Privacy: what's stored per user, retention, and deleting an account.
-- Abuse and load: rate limits on the API once it's public.
+Dropped: sign-up and sign-in, per-user accounts, a public version, a "fits me" ranking from a profile, and Telegram (email instead).
