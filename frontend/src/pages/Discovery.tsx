@@ -3,6 +3,7 @@ import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, List, 
 import { useEffect, useMemo, useState } from "react";
 
 import { SearchField, TopBar } from "../components/Brand";
+import { StageBadge } from "../components/Track";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { ChipMultiSelect, FieldMultiSelect } from "../components/ui/multi-select";
@@ -31,6 +32,7 @@ import {
   sourceName,
   timeAgo,
 } from "../lib/format";
+import { type Stage, usePersonal } from "../lib/personal";
 import { navigate, useMedia } from "../lib/router";
 import { cn } from "../lib/utils";
 
@@ -61,6 +63,7 @@ function open(id: string) {
 export function Discovery(p: Props) {
   const { filters: f } = p;
   const [sheetOpen, setSheetOpen] = useState(false);
+  const personal = usePersonal();
   const wide = useMedia("(min-width: 900px)");
   const pages = Math.max(1, Math.ceil(p.items.length / PAGE_SIZE));
   const page = Math.min(p.page, pages);
@@ -252,7 +255,7 @@ export function Discovery(p: Props) {
         <ul key={listKey}>
           <AnimatePresence initial={true}>
             {rows.map((h, i) => (
-              <Row key={h.id} h={h} index={i} highlight={h.id === p.highlightId} isNew={isNew(h, p.firstRunAt)} />
+              <Row key={h.id} h={h} index={i} highlight={h.id === p.highlightId} isNew={isNew(h, p.firstRunAt)} stage={personal.items[h.id]?.status ?? null} />
             ))}
           </AnimatePresence>
         </ul>
@@ -300,7 +303,7 @@ function Pills({ h, compact }: { h: Hackathon; compact?: boolean }) {
   );
 }
 
-function Row({ h, index, highlight, isNew }: { h: Hackathon; index: number; highlight: boolean; isNew: boolean }) {
+function Row({ h, index, highlight, isNew, stage }: { h: Hackathon; index: number; highlight: boolean; isNew: boolean; stage: Stage | null }) {
   const deadline = deadlineLabel(h);
   const dates = dateRange(h.start_date, h.end_date);
   const summary = h.summary;
@@ -326,6 +329,7 @@ function Row({ h, index, highlight, isNew }: { h: Hackathon; index: number; high
           <h2 className="text-[18px] leading-snug font-bold tracking-[-0.01em] text-ink transition-colors duration-200 group-hover:text-teal wide:text-[31px] wide:leading-tight">
             {h.title}
             {isNew && <NewBadge className="ml-2 -translate-y-px wide:ml-3 wide:-translate-y-1" />}
+            {stage && stage !== "hidden" && <StageBadge status={stage} className="ml-2 -translate-y-px wide:ml-3 wide:-translate-y-1" />}
           </h2>
           {h.organizer && (
             <p className="text-[14px] text-periwinkle wide:mt-0.5 wide:text-[17.5px]">

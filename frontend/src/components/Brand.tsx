@@ -1,7 +1,8 @@
-import { Search } from "lucide-react";
+import { Bookmark, Search, Settings as SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { navigate } from "../lib/router";
+import { usePersonal } from "../lib/personal";
+import { navigate, usePath } from "../lib/router";
 import { cn } from "../lib/utils";
 
 /** The logo: a compass, its needle's north half in orange. */
@@ -77,10 +78,62 @@ export function SearchField({
 }
 
 export function TopBar({ children }: { children?: ReactNode }) {
+  const { items } = usePersonal();
+  const path = usePath();
+  const tracked = Object.values(items).filter((t) => t.status && t.status !== "hidden").length;
   return (
-    <header className="flex h-[60px] items-center gap-6 border-b border-line px-5 wide:h-[74px] wide:px-7">
+    <header className="flex h-[60px] items-center gap-4 border-b border-line px-5 wide:h-[74px] wide:gap-6 wide:px-7">
       <BrandLink />
       {children}
+      <nav aria-label="Your pages" className="ml-auto flex items-center gap-1 wide:gap-1.5">
+        <NavLink to="/me" label="My hackathons" active={path.startsWith("/me")} count={tracked}>
+          <Bookmark className="h-[19px] w-[19px]" strokeWidth={2} />
+        </NavLink>
+        <NavLink to="/settings" label="Settings" active={path.startsWith("/settings")} iconOnly>
+          <SettingsIcon className="h-[19px] w-[19px]" strokeWidth={2} />
+        </NavLink>
+      </nav>
     </header>
+  );
+}
+
+function NavLink({
+  to,
+  label,
+  active,
+  count,
+  iconOnly,
+  children,
+}: {
+  to: string;
+  label: string;
+  active: boolean;
+  count?: number;
+  iconOnly?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <a
+      href={to}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        navigate(to);
+      }}
+      aria-current={active ? "page" : undefined}
+      aria-label={iconOnly ? label : undefined}
+      className={cn(
+        "relative flex h-10 items-center gap-2 rounded-[10px] px-2.5 text-[15px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-teal/30 wide:px-3",
+        active ? "bg-[#e5f7fb] text-teal" : "text-ink-2 hover:bg-field",
+      )}
+    >
+      {children}
+      {!iconOnly && <span className="sr-only wide:not-sr-only">{label}</span>}
+      {!!count && (
+        <span className="flex h-[19px] min-w-[19px] items-center justify-center rounded-full bg-teal px-1.5 text-[11.5px] font-bold text-white">
+          {count}
+        </span>
+      )}
+    </a>
   );
 }

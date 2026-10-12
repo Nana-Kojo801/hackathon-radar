@@ -4,9 +4,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { fetchData, fetchJSON, type Hackathon, type Meta } from "./lib/api";
 import { healthWarning } from "./lib/health";
 import { applyFilters, type Filters, loadFilters, saveFilters } from "./lib/filters";
-import { detailId, navigate, usePath } from "./lib/router";
+import { sync, usePersonal } from "./lib/personal";
+import { navigate, type PageKey, pageKey, usePath } from "./lib/router";
 import { Details } from "./pages/Details";
 import { Discovery } from "./pages/Discovery";
+import { MyHackathons } from "./pages/MyHackathons";
+import { SettingsPage } from "./pages/SettingsPage";
 
 interface ListResponse {
   items: Hackathon[];
@@ -25,7 +28,13 @@ if ("scrollRestoration" in window.history) window.history.scrollRestoration = "m
 
 export default function App() {
   const path = usePath();
-  const routeId = detailId(path);
+  const route = pageKey(path);
+  const personal = usePersonal();
+
+  // Pull personal data (saved, notes, settings) once on start; it also syncs on focus.
+  useEffect(() => {
+    void sync();
+  }, []);
 
   const [items, setItems] = useState<Hackathon[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -77,7 +86,12 @@ export default function App() {
     saveFilters(f);
   }, []);
 
-  const visible = useMemo(() => applyFilters(items, filters), [items, filters]);
+  // "Not interested" hackathons stay out of the list (they're on My hackathons).
+  const visible = useMemo(
+    () => applyFilters(items.filter((h) => personal.items[h.id]?.status !== "hidden"), filters),
+    [items, filters, personal.items],
+  );
+  const live = useMemo(() => new Map(items.map((h) => [h.id, h])), [items]);
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
     items.forEach((h) => h.categories.forEach((c) => counts.set(c, (counts.get(c) ?? 0) + 1)));
@@ -92,7 +106,7 @@ export default function App() {
   // (hidden) under the detail page, so going back restores its scroll position
   // and briefly marks the hackathon you came back from.
   const reduced = useReducedMotion();
-  const [view, setView] = useState<string | null>(routeId); // detail id, or null for the list
+  const [view, setView] = useState<PageKey>(route); // null for the list
   const [leaving, setLeaving] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
   const listScroll = useRef(0);
@@ -101,7 +115,7 @@ export default function App() {
 
   useEffect(() => {
     window.clearTimeout(timer.current);
-    if (routeId === view) {
+    if (route === view) {
       // Navigated back before the fade finished: stay on this page.
       setLeaving(false);
       return;
@@ -111,13 +125,13 @@ export default function App() {
     timer.current = window.setTimeout(
       () => {
         setLeaving(false);
-        setHighlight(routeId === null ? view : null);
-        setView(routeId);
+        setHighlight(route === null && view?.startsWith("h:") ? view.slice(2) : null);
+        setView(route);
       },
       reduced ? 0 : LEAVE_MS,
     );
     return () => window.clearTimeout(timer.current);
-  }, [routeId, view, reduced]);
+  }, [route, view, reduced]);
 
   useLayoutEffect(() => {
     if (view !== null) {
@@ -177,11 +191,21 @@ export default function App() {
               highlightId={highlight}
             />
           </div>
-          {view && (
+          {view === "me" && (
+            <div key="me" className={leaving ? "page-leave" : "page-enter-fade"}>
+              <MyHackathons live={live} />
+            </div>
+          )}
+          {view === "settings" && (
+            <div key="settings" className={leaving ? "page-leave" : "page-enter-fade"}>
+              <SettingsPage categories={meta?.categories.map((c) => c.category) ?? categories.map((c) => c.category)} />
+            </div>
+          )}
+          {view?.startsWith("h:") && (
             <div key={view} className={leaving ? "page-leave" : "page-enter-fade"}>
               <Details
-                id={view}
-                initial={items.find((h) => h.id === view)}
+                id={view.slice(2)}
+                initial={live.get(view.slice(2)) ?? personal.items[view.slice(2)]?.hackathon}
                 totalCount={items.length || meta?.active_count || 0}
                 lastRefresh={lastRefresh}
                 query=""

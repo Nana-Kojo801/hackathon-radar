@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { CalendarButton, ClaudeActions, ShareButton } from "../components/Actions";
 import { SearchField, TopBar } from "../components/Brand";
+import { TrackPanel } from "../components/Track";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { fetchData, type Hackathon, type HackathonDetail } from "../lib/api";
@@ -276,6 +277,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
           <ShareButton h={h} />
         </div>
         <ClaudeActions detail={detail} className="mt-2.5 wide:hidden" />
+        <TrackPanel h={h} className="mt-4 wide:hidden" />
 
         <Tabs />
 
@@ -367,6 +369,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
                 <ShareButton h={h} className="h-10 text-[14.5px]" />
               </div>
               <ClaudeActions detail={detail} className="mt-2.5 [&>*]:h-10 [&>*]:text-[14.5px]" />
+              <TrackPanel h={h} className="mt-4 border-t border-line pt-4" />
               <dl className="mt-4">
                 <SideRow label="Format" icon={formatIcon}>
                   <span className="text-[16.5px] font-medium text-ink">{FORMAT_LABEL[h.format]}</span>

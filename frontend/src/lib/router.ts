@@ -46,3 +46,15 @@ export function useMedia(query: string): boolean {
   }, [query]);
   return match;
 }
+
+/** Which page a path shows: null for the list, "h:<id>", "me" or "settings". */
+export type PageKey = `h:${string}` | "me" | "settings" | null;
+
+export function pageKey(path: string): PageKey {
+  const id = detailId(path);
+  if (id) return `h:${id}`;
+  const clean = path.replace(/\/+$/, "");
+  if (clean === "/me") return "me";
+  if (clean === "/settings") return "settings";
+  return null;
+}
