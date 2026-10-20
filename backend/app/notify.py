@@ -161,7 +161,7 @@ def _thumb(h: dict) -> str:
 
 
 def _card_html(h: dict, now: datetime, note: str | None = None) -> str:
-    app = f"{config.APP_URL}/h/{h['id']}"
+    app = f"{config.APP_URL}/h/{h['id']}?from=email"
     closes = _closes(h, now)
     note_html = (f'<p style="margin:10px 0 0;padding:8px 10px;background:#f4f4f7;border-radius:10px;color:#3a3a3c;font-size:13.5px;line-height:1.4">'
                  f'{html.escape(note)}</p>') if note else ""
@@ -211,7 +211,7 @@ def _layout(heading: str, intro: str, sections: list[tuple[str | None, str]]) ->
         + f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0">{rows}</table>'
         for t, rows in sections
     )
-    settings = f"{config.APP_URL}/settings"
+    settings = f"{config.APP_URL}/settings?from=email"
     return (
         '<div style="background:#f2f2f7;padding:24px 14px;font-family:-apple-system,BlinkMacSystemFont,\'SF Pro Text\',Segoe UI,Roboto,Helvetica,Arial,sans-serif">'
         '<div style="max-width:560px;margin:0 auto">'

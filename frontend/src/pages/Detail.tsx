@@ -25,6 +25,7 @@ import { bouncy, press, spring } from "../lib/motion";
 import { claudeUrl, ideasPrompt } from "../lib/prompt";
 import { parseBlocks, RichText } from "../lib/richtext";
 import { type Stage, track, usePersonal } from "../lib/personal";
+import { logView } from "../lib/stats";
 import { copyText, toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 
@@ -41,6 +42,8 @@ export function Detail({ id, initial }: { id: string; initial?: Hackathon }) {
       .catch((e) => !ctrl.signal.aborted && setError(e instanceof Error ? e.message : String(e)));
     return () => ctrl.abort();
   }, [id]);
+
+  useEffect(() => logView(id), [id]);
 
   const h: Hackathon | undefined = detail ?? initial;
 

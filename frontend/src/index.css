@@ -77,6 +77,12 @@
   --orange-fill: #ff9500;
   --green: #1b7a34;
   --green-soft: rgba(27, 122, 52, 0.1);
+  /* Chart series (categorical, validated for colour-blind separation), and the de-emphasised "market" series. */
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-muted: #c7c7cc;
   --neutral-soft: rgba(108, 108, 112, 0.09);
   --seg-on: #ffffff;
   --scrim: rgba(0, 0, 0, 0.32);
@@ -113,6 +119,11 @@
   --orange-fill: #ff9f0a;
   --green: #4cd964;
   --green-soft: rgba(76, 217, 100, 0.18);
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-muted: #48484a;
   --neutral-soft: rgba(174, 174, 178, 0.16);
   --seg-on: #636366;
   --scrim: rgba(0, 0, 0, 0.55);

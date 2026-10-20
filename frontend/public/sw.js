@@ -11,7 +11,7 @@
  * It also shows push notifications sent by the server (backend/app/push.py)
  * and opens the right page when one is tapped.
  */
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
 const DATA = `data-${VERSION}`;
@@ -97,7 +97,10 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  const target = new URL(event.notification.data?.url || "/", self.location.origin);
+  // Tells the app the open came from a notification (for the stats page).
+  target.searchParams.set("from", "push");
+  const url = target.href;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
       const open = windows.find((w) => new URL(w.url).origin === self.location.origin);

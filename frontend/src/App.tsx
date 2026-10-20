@@ -1,5 +1,5 @@
 import { MotionConfig } from "framer-motion";
-import { type PointerEvent, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, type PointerEvent, type ReactNode, type RefObject, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { ToastView } from "./components/kit";
 import { TabBar } from "./components/TabBar";
@@ -11,6 +11,7 @@ import { healthWarning } from "./lib/health";
 import { sync, usePersonal } from "./lib/personal";
 import { setBadge } from "./lib/push";
 import { goBack, type Overlay, parse, TAB_PATH, type Tab, usePath } from "./lib/router";
+import { flush as flushActivity, startActivityLog } from "./lib/stats";
 import { currentOffset, fade, slide } from "./lib/transition";
 import { cn } from "./lib/utils";
 import { type AppData, DataContext } from "./lib/store";
@@ -22,6 +23,9 @@ import { NotificationsPage } from "./pages/Notifications";
 import { Saved } from "./pages/Saved";
 import { SettingsTab } from "./pages/Settings";
 import { Today } from "./pages/Today";
+
+// The stats page and its charts load on first visit, keeping them out of the start-up bundle.
+const StatsPage = lazy(() => import("./pages/Stats").then((m) => ({ default: m.StatsPage })));
 
 interface ListResponse {
   items: Hackathon[];
@@ -48,7 +52,12 @@ export default function App() {
   // Pull personal data (saved, notes, settings) once on start; it also syncs on focus.
   useEffect(() => {
     void sync();
+    startActivityLog();
   }, []);
+  // Activity logged before the device was connected goes up once it is.
+  useEffect(() => {
+    if (personal.key) void flushActivity();
+  }, [personal.key]);
 
   // ------------------------------------------------------------ data
   const [all, setAll] = useState<Hackathon[]>([]);
@@ -189,6 +198,12 @@ export default function App() {
     if (o.kind === "detail") return <Detail id={o.id} initial={live.get(o.id) ?? personal.items[o.id]?.hackathon} />;
     if (o.kind === "appearance") return <AppearancePage />;
     if (o.kind === "notifications") return <NotificationsPage />;
+    if (o.kind === "stats")
+      return (
+        <Suspense fallback={<div className="absolute inset-0 bg-bg" />}>
+          <StatsPage />
+        </Suspense>
+      );
     return <EmailAlertsPage />;
   };
 

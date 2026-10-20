@@ -160,6 +160,7 @@ The app is for one person, so there are no accounts. Your personal data lives in
 - **Ask Claude for ideas:** **Brainstorm ideas with Claude** opens Claude with a brief that has everything known about the hackathon (dates, prizes, themes, rules, the organizer's description), or copies it. Claude's `?q=` prefill isn't documented, so the prompt is copied either way.
 - **Share** sends the hackathon's own page (Devpost, Devfolio, ...), not this app's link.
 - **Badge:** the installed app's icon shows how many saved hackathons close this week (Settings › Notifications › Badge on app icon).
+- **Stats** (Settings › Your stats, or **Your week** at the bottom of Today): **You** shows the share of listed hackathons you register for, your funnel from opened to won, win rate, month by month, how often and when you open the app, whether emails, notifications or the Home Screen bring you back, how long you take to register, the themes and formats you lean towards, and the prize pools you go for. **Market** shows open prize money, new hackathons per week, a calendar of deadlines ahead, prize sizes, themes, platforms and the radar's own health. Activity is counted from when the stats page shipped; stage history from before that was rebuilt from when each hackathon was first saved.
 
 ## Push notifications
 
@@ -198,7 +199,8 @@ The free Render API sleeps after 15 minutes idle and takes 30-60 seconds to wake
 - `GET /hackathons/{id}`: everything in the list plus `description` (the long text) and `prizes` (the breakdown, with each prize's amount per winner and the winner count).
 - `GET /meta`: category counts, last refresh time, and the latest run per source with fetched/new/errors/tokens.
 - `GET /push/key`: the public key for push subscriptions (null when push isn't set up).
-- `/me/...` (needs `X-Personal-Key`): `GET /me`, `PUT /me/hackathons/{id}`, `PUT /me/settings`, `POST`/`DELETE /me/push` (this device's push subscription) and `POST /me/push/test`.
+- `GET /stats`: market numbers for the stats page (also in the snapshot as `stats.json`).
+- `/me/...` (needs `X-Personal-Key`): `GET /me`, `PUT /me/hackathons/{id}`, `PUT /me/settings`, `POST`/`DELETE /me/push` (this device's push subscription), `POST /me/push/test`, `GET /me/stats` and `POST /me/events` (app opens and hackathons viewed, for the stats page).
 - `POST /admin/refresh`: needs the `X-Admin-Token` header.
 - `GET /health`
 

@@ -10,6 +10,7 @@ so the copy matches the API exactly:
 
     <out_dir>/list.json      GET /hackathons (every open/upcoming hackathon)
     <out_dir>/meta.json      GET /meta, plus generated_at
+    <out_dir>/stats.json     GET /stats (the market half of the stats page)
     <out_dir>/h/<id>.json    GET /hackathons/<id>, one per listed hackathon
 """
 
@@ -49,6 +50,10 @@ def build(out: Path) -> dict:
         meta = client.get("/meta")
         meta.raise_for_status()
         _write(out / "meta.json", {**meta.json(), "generated_at": datetime.now(timezone.utc).isoformat()})
+
+        stats = client.get("/stats")
+        stats.raise_for_status()
+        _write(out / "stats.json", stats.json())
 
         for h in items:
             r = client.get(f"/hackathons/{h['id']}")

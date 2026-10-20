@@ -7,7 +7,7 @@ import { type MouseEvent, useEffect, useState } from "react";
  */
 
 export type Tab = "today" | "explore" | "saved" | "settings";
-export type Overlay = { kind: "detail"; id: string } | { kind: "appearance" } | { kind: "notifications" } | { kind: "email" };
+export type Overlay = { kind: "detail"; id: string } | { kind: "appearance" } | { kind: "notifications" } | { kind: "email" } | { kind: "stats" };
 
 export interface Route {
   tab: Tab;
@@ -30,6 +30,7 @@ export function parse(path: string): Route {
   if (detail) return { tab: lastTab, overlay: { kind: "detail", id: detail[1] }, key: `h:${detail[1]}` };
   if (clean === "/settings/appearance") return { tab: "settings", overlay: { kind: "appearance" }, key: "appearance" };
   if (clean === "/settings/notifications") return { tab: "settings", overlay: { kind: "notifications" }, key: "notifications" };
+  if (clean === "/settings/stats") return { tab: "settings", overlay: { kind: "stats" }, key: "stats" };
   if (clean === "/settings/email") return { tab: "settings", overlay: { kind: "email" }, key: "email" };
   const tab: Tab = clean === "/explore" ? "explore" : clean === "/saved" || clean === "/me" ? "saved" : clean === "/settings" ? "settings" : "today";
   lastTab = tab;

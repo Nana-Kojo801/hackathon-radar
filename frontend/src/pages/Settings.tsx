@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { AppIcon, Icon } from "../components/Icon";
 import { CompactBar, Group, LargeTitle, Menu, RowLink, RowMenu, RowToggle, useScrolled } from "../components/kit";
+import { StatsCard } from "../components/StatsTeasers";
 import { ACCENTS, setAppearance, type StartTab, useAppearance } from "../lib/appearance";
 import { compactMoney, countdown, nextRefresh, timeAgo } from "../lib/format";
 import { bouncy, press, spring } from "../lib/motion";
@@ -64,6 +65,7 @@ export function SettingsTab() {
       ) : (
         <ConnectCard />
       )}
+      <StatsCard />
 
       <div className={cn(off && "pointer-events-none opacity-50")} aria-disabled={off}>
         <Group header="Alerts">

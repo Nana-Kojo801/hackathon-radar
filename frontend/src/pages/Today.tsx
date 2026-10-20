@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 import { Icon, type IconName } from "../components/Icon";
 import { Banner, CompactBar, DueTag, GlassButton, LargeTitle, PrimaryButton, SectionHeader, StageTag, Thumb, useScrolled } from "../components/kit";
+import { WeekRecap } from "../components/StatsTeasers";
 import { meta } from "../components/HackRow";
 import type { Hackathon } from "../lib/api";
 import { DEFAULT_FILTERS, type Filters } from "../lib/filters";
@@ -175,6 +176,7 @@ export function Today() {
               )}
             </>
           )}
+          <WeekRecap />
         </>
       )}
     </div>

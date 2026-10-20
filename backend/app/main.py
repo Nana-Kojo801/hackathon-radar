@@ -7,8 +7,8 @@ from uuid import UUID
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import config, db, personal, push
-from .categories import CATEGORIES, STATUSES, VETTED_SOURCES
+from . import config, db, personal, push, stats
+from .categories import CATEGORIES, STATUSES, VISIBLE
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("api")
@@ -24,6 +24,8 @@ app.add_middleware(
 app.include_router(personal.router)
 app.include_router(push.router)
 app.include_router(push.public_router)
+app.include_router(stats.router)
+app.include_router(stats.public_router)
 
 LIST_COLUMNS = """
     id, source, source_url, alt_urls, title, organizer, summary, image_url,
@@ -33,9 +35,6 @@ LIST_COLUMNS = """
     first_seen_at, last_seen_at, (enriched_at IS NOT NULL) AS enriched
 """
 
-# Web finds and Unstop listings stay hidden until the AI has confirmed they're real hackathons.
-_VETTED = ", ".join(f"'{s}'" for s in VETTED_SOURCES)
-VISIBLE = f"NOT is_hidden AND NOT (source IN ({_VETTED}) AND enriched_at IS NULL)"
 
 SORTS = {
     "prize": "prize_usd DESC NULLS LAST, relevance_score DESC NULLS LAST, first_seen_at DESC",

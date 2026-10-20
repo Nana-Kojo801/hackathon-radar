@@ -105,6 +105,14 @@ def track(hackathon_id: UUID, body: TrackBody) -> dict:
         cur.execute("SELECT 1 FROM hackathons WHERE id = %s", (hackathon_id,))
         if cur.fetchone() is None:
             raise HTTPException(404, "hackathon not found")
+        cur.execute("SELECT status FROM my_hackathons WHERE hackathon_id = %s", (hackathon_id,))
+        before = (cur.fetchone() or {}).get("status")
+        if before != body.status:
+            # Stage history for the stats page (app/stats.py).
+            cur.execute(
+                "INSERT INTO my_events (kind, hackathon_id, detail) VALUES ('stage', %s, %s)",
+                (hackathon_id, body.status or "removed"),
+            )
         if body.status is None and not note:
             cur.execute("DELETE FROM my_hackathons WHERE hackathon_id = %s", (hackathon_id,))
             return {"hackathon_id": hackathon_id, "status": None, "note": "", "removed": True}
