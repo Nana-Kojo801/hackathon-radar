@@ -6,11 +6,11 @@ import { duration, easing } from "../lib/transition";
 import { cn } from "../lib/utils";
 import { Icon, type IconName } from "./Icon";
 
-const TABS: { tab: Tab; label: string; icon: IconName; fill: boolean }[] = [
-  { tab: "today", label: "Today", icon: "home", fill: true },
-  { tab: "explore", label: "Explore", icon: "compass", fill: false },
-  { tab: "saved", label: "Saved", icon: "bookmark", fill: true },
-  { tab: "settings", label: "Settings", icon: "gear", fill: false },
+const TABS: { tab: Tab; label: string; icon: IconName }[] = [
+  { tab: "today", label: "Today", icon: "home" },
+  { tab: "explore", label: "Explore", icon: "compass" },
+  { tab: "saved", label: "Saved", icon: "bookmark" },
+  { tab: "settings", label: "Settings", icon: "gear" },
 ];
 
 /**
@@ -62,7 +62,8 @@ export function TabBar({ active, hidden, badge, onReselect }: { active: Tab; hid
               )}
             >
               <span className="relative">
-                <Icon name={t.icon} size={24} stroke={1.9} filled={on && t.fill} />
+                {/* The selected tab's icon is solid, like iOS. */}
+                <Icon name={t.icon} size={25} filled={on} />
                 {t.tab === "saved" && badge > 0 && (
                   <span className="absolute -top-1 -right-2.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full border-[1.5px] border-[var(--card)] bg-red-fill px-1 text-[10.5px] font-bold text-white">
                     {badge}

@@ -154,6 +154,8 @@ How it behaves:
 - **Going back** returns you to the same place in the list; each tab keeps its own scroll position, and your filters are kept.
 - **Speed:** filtering, sorting and search all happen in the browser, so they respond instantly.
 
+**Icons** are [Phosphor](https://phosphoricons.com) (MIT): `frontend/scripts/icons.mjs` copies the ones the app uses, in regular, bold and fill weights, into `src/components/icons.generated.ts`. To add one, add it to the script's list and run it against the `@phosphor-icons/core` package (instructions at the top of the script).
+
 ## Personal features
 
 The app is for one person, so there are no accounts. Your personal data lives in Neon behind the personal key (`PERSONAL_KEY`), which each device enters once in **Settings**. Your phone and laptop share it.

@@ -288,7 +288,7 @@ function Hero({ h }: { h: Hackathon }) {
           </>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-white">
-            <svg width="72" height="72" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <svg width="80" height="80" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
               <path d={art.glyph} />
             </svg>
           </div>

@@ -218,7 +218,8 @@ function RowIcon({ icon, bg }: { icon: IconName; bg?: string }) {
   if (!bg) return <Icon name={icon} size={21} className="shrink-0 text-tint" />;
   return (
     <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[8px] text-white" style={{ background: bg }}>
-      <Icon name={icon} size={18} stroke={2.1} />
+      {/* Solid white symbols on coloured tiles, like iOS Settings. */}
+      <Icon name={icon} size={18} filled />
     </span>
   );
 }
@@ -642,7 +643,7 @@ export function Thumb({ h, size, radius, className, contain }: { h: Hackathon; s
           className={cn("h-full w-full", isLogo ? "object-contain p-[16%]" : contain ? "object-contain" : "object-cover")}
         />
       ) : (
-        <svg width={size * 0.46} height={size * 0.46} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <svg width={size * 0.5} height={size * 0.5} viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
           <path d={glyph.glyph} />
         </svg>
       )}

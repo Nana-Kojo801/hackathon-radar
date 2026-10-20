@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { Icon, type IconName } from "../components/Icon";
 import { GlassButton, Menu, Thumb } from "../components/kit";
@@ -10,6 +10,7 @@ import { calendarEvents, downloadIcs, googleCalendarUrl } from "../lib/calendar"
 import {
   bannerOf,
   categoryLabel,
+  cleanText,
   daysLeft,
   durationDays,
   dayMonth,
@@ -264,38 +265,63 @@ function StatusPill({ h }: { h: Hackathon }) {
   );
 }
 
+/**
+ * The key facts as a 2x2 grid of tiles: a tinted icon and label, the value large,
+ * and up to two lines of detail below. Half the width each (not a quarter), so a
+ * non-cash prize note or a long place name wraps instead of crowding the row.
+ */
 function Facts({ h, detail }: { h: Hackathon; detail: HackathonDetail | null }) {
   const days = daysLeft(h);
-  const formatIcon: IconName = h.format === "in_person" ? "pin" : h.format === "hybrid" ? "shuffle" : "monitor";
-  const where = h.format === "online" ? "Online" : h.location_text?.split(",")[0]?.trim() || FORMAT_LABEL[h.format];
-  const perks = detail?.prizes.some((p) => p.perks?.length) || h.prize_notes;
-  const cells: { label: string; value: ReactNode; sub: string; tone?: string }[] = [
-    { label: "Prize pool", value: prizeShort(h), sub: perks ? "+ perks" : h.prize_usd ? "in prizes" : "not announced" },
-    days === null
-      ? { label: "Starts", value: h.start_date ? dayMonth(h.start_date) : "TBA", sub: h.start_date ? "event start" : "no dates yet" }
-      : days < 0
-        ? { label: "Closed", value: dayMonth(h.registration_deadline), sub: "registration" }
-        : { label: "Closes in", value: days === 0 ? "Today" : `${days} ${days === 1 ? "day" : "days"}`, sub: weekdayDate(h.registration_deadline), tone: days <= 1 ? "text-red" : days <= 7 ? "text-orange" : undefined },
-    { label: "Format", value: <Icon name={formatIcon} size={22} />, sub: where },
+  const perks = detail?.prizes.some((p) => p.perks?.length);
+  const place = h.location_text?.split(",").map((x) => x.trim()).filter(Boolean) ?? [];
+  const tiles: { icon: IconName; tint: string; label: string; value: string; sub: string | null; tone?: string }[] = [
     {
+      icon: "trophy",
+      tint: "var(--gold-fg)",
+      label: "Prize pool",
+      value: prizeShort(h),
+      sub: h.prize_notes ? cleanText(h.prize_notes) : h.prize_usd ? (perks ? "Plus perks" : "In prizes") : "Not announced yet",
+    },
+    days === null
+      ? { icon: "calendar", tint: "var(--tint)", label: "Starts", value: h.start_date ? dayMonth(h.start_date) : "TBA", sub: h.start_date ? weekdayDate(h.start_date) : "No dates yet" }
+      : days < 0
+        ? { icon: "calendar", tint: "var(--label-2)", label: "Registration", value: "Closed", sub: weekdayDate(h.registration_deadline) }
+        : {
+            icon: "clock",
+            tint: days <= 1 ? "var(--red)" : days <= 7 ? "var(--orange)" : "var(--tint)",
+            label: "Closes",
+            value: days === 0 ? "Today" : days === 1 ? "Tomorrow" : `In ${days} days`,
+            sub: weekdayDate(h.registration_deadline),
+            tone: days <= 1 ? "text-red" : days <= 7 ? "text-orange" : undefined,
+          },
+    {
+      icon: h.format === "in_person" ? "pin" : h.format === "hybrid" ? "shuffle" : "monitor",
+      tint: "var(--green)",
+      label: "Format",
+      value: h.format === "online" ? "Online" : h.format === "unknown" ? "TBA" : (place[0] ?? FORMAT_LABEL[h.format]),
+      sub: h.format === "online" ? "Join from anywhere" : h.format === "unknown" ? "Not stated yet" : [FORMAT_LABEL[h.format], ...place.slice(1)].join(" · "),
+    },
+    {
+      icon: "globe",
+      tint: "#5856D6",
       label: "Open to",
-      value: <Icon name="globe" size={22} />,
-      sub: h.international_ok === true ? "Worldwide" : h.international_ok === false ? "Some regions" : h.student_only ? "Students" : "Not stated",
+      value: h.international_ok === true ? "Worldwide" : h.international_ok === false ? "Some regions" : h.student_only ? "Students" : "Not stated",
+      sub: h.student_only ? "Students only" : h.international_ok === false ? "Check where you can join from" : h.international_ok === true ? "Any country" : "Check the rules",
     },
   ];
   return (
-    <motion.section
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ ...spring, delay: 0.05 }}
-      aria-label="Key facts"
-      className="mt-6 grid grid-cols-4 border-y hairline px-1"
-    >
-      {cells.map((c, i) => (
-        <div key={c.label} className={cn("flex flex-col items-center gap-[3px] px-1 py-3 text-center", i > 0 && "border-l hairline")}>
-          <span className="text-[10.5px] font-semibold tracking-[0.03em] text-label-2 uppercase">{c.label}</span>
-          <span className={cn("flex h-[26px] items-center text-[calc(19px*var(--ts))] font-bold tracking-[-0.02em] tabular", c.tone)}>{c.value}</span>
-          <span className="line-clamp-1 text-caption text-label-2">{c.sub}</span>
+    <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ ...spring, delay: 0.05 }} aria-label="Key facts" className="mx-4 mt-5 grid grid-cols-2 gap-2.5">
+      {tiles.map((t) => (
+        <div key={t.label} className="card flex min-w-0 flex-col rounded-[20px] px-3.5 pt-3 pb-3.5">
+          <span className="flex items-center gap-1.5 text-footnote font-semibold text-label-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px]" style={{ color: t.tint, background: `color-mix(in srgb, ${t.tint} 14%, transparent)` }}>
+              <Icon name={t.icon} size={15} filled />
+            </span>
+            {t.label}
+          </span>
+          {/* Long values (a city, "Some regions") step down a size rather than crowd. */}
+          <span className={cn("mt-2 line-clamp-2 leading-tight font-bold tracking-[-0.022em] tabular", t.value.length > 11 ? "text-[calc(17px*var(--ts))]" : "text-[calc(22px*var(--ts))]", t.tone)}>{t.value}</span>
+          {t.sub && <span className="mt-0.5 line-clamp-2 text-footnote leading-snug text-label-2">{t.sub}</span>}
         </div>
       ))}
     </motion.section>
@@ -479,9 +505,7 @@ function ClaudeCard({ detail }: { detail: HackathonDetail | null }) {
           className="card mx-4 mt-3 flex w-[calc(100%-32px)] items-center gap-3.5 rounded-[22px] px-4 py-3.5 text-left disabled:opacity-60"
         >
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] text-white" style={{ background: "linear-gradient(145deg, #E8875E 0%, #C2581F 100%)" }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 2.5l1.9 5.6a3 3 0 0 0 1.9 1.9l5.7 2-5.7 2a3 3 0 0 0-1.9 1.9L12 21.5l-1.9-5.6a3 3 0 0 0-1.9-1.9L2.5 12l5.7-2a3 3 0 0 0 1.9-1.9z" />
-            </svg>
+            <Icon name="sparkle" size={24} filled />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-callout font-semibold">Brainstorm ideas with Claude</span>
