@@ -44,6 +44,7 @@ DECISIONS.md      choices that differ from (or fill gaps in) the spec
 | `PERSONAL_KEY` | Render | unlocks your personal data (saved hackathons, notes, email settings); each device enters it once in Settings. Falls back to `ADMIN_TOKEN` if unset |
 | `RESEND_API_KEY` | GitHub secret | [Resend](https://resend.com) API key, for the email alerts |
 | `VAPID_PRIVATE_KEY` | Render and GitHub secret | turns on push notifications; make one with `python -m app.push --generate-key` (see [Push notifications](#push-notifications)) |
+| `GITHUB_TOKEN` | Render | lets **Run now** in Settings start the refresh (see [Trigger a manual refresh](#trigger-a-manual-refresh)) |
 | `VAPID_SUBJECT` | optional | contact for the push services, default `mailto:` + `NOTIFY_EMAIL` |
 | `NOTIFY_EMAIL` | GitHub secret | where the emails go |
 | `NOTIFY_FROM` | optional GitHub variable | default `Hackathon Radar <onboarding@resend.dev>`, which can only send to your Resend account's own address |
@@ -124,6 +125,7 @@ Note: GitHub pauses scheduled workflows in repos with no activity for 60 days. I
 
 Any of these works:
 
+- **In the app:** Settings › Search › **Run now**. It starts the GitHub refresh and shows it live: each platform as it's searched (found and new), then the AI check, tidying, covers, alerts and the snapshot publish, with a timer. When it's done the list reloads. One-time setup: on GitHub, Settings › Developer settings › Fine-grained tokens › *Generate new token*, repository access *Only select repositories* › `hackathon-radar`, permission **Actions: Read and write** (nothing else), then add it on Render as `GITHUB_TOKEN`. Without it the card still follows scheduled runs; only the button is off.
 - **GitHub:** Actions → *Refresh hackathons* → *Run workflow*. You can limit it to some sources, e.g. `devpost,mlh`.
 - **CLI:** `gh workflow run refresh.yml` (or `gh workflow run refresh.yml -f sources=web`)
 - **API:** `curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" https://<render-url>/admin/refresh`. This runs the pipeline inside the Render instance in the background. It needs the OpenAI/Tavily keys set on Render too.

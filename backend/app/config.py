@@ -29,6 +29,10 @@ VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "").strip()
 VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "") or (f"mailto:{NOTIFY_EMAIL}" if NOTIFY_EMAIL else "mailto:hackathon-radar@example.com")
 # Where links in emails and notifications point.
 APP_URL = (os.getenv("APP_URL", "") or "https://hackathon-radar.nkabenyah.workers.dev").rstrip("/")
+# "Refresh now" in Settings starts the GitHub Actions refresh (app/refresh.py): a fine-grained
+# token for the repository with Actions read and write.
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
+GITHUB_REPO = os.getenv("GITHUB_REPO", "") or "nana-kojo801/hackathon-radar"
 MAX_ENRICH_PER_RUN = _int("MAX_ENRICH_PER_RUN", 60)
 MAX_DISCOVERY_PAGES = _int("MAX_DISCOVERY_PAGES", 12)
 ALLOWED_ORIGINS = [

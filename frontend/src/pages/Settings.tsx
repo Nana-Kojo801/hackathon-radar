@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { AppIcon, Icon } from "../components/Icon";
 import { CompactBar, Group, LargeTitle, Menu, RowLink, RowMenu, RowToggle, useScrolled } from "../components/kit";
+import { RefreshCard } from "../components/RefreshCard";
 import { StatsCard } from "../components/StatsTeasers";
 import { ACCENTS, setAppearance, type StartTab, useAppearance } from "../lib/appearance";
 import { compactMoney, countdown, nextRefresh, timeAgo } from "../lib/format";
@@ -87,6 +88,8 @@ export function SettingsTab() {
         <RowLink icon="palette" iconBg="#FF2D55" label="Appearance" value={`${themeName}, ${accentName}`} href="/settings/appearance" />
         <RowMenu icon="home" iconBg="#34C759" label="Open the app on" value={look.startTab} options={START_OPTIONS} onChange={(v) => setAppearance({ startTab: v })} />
       </Group>
+
+      {p.key && <RefreshCard />}
 
       <Group header="Data" footer="Listings refresh every 6 hours from Devpost, Devfolio, MLH, TAIKAI, ETHGlobal, Unstop and the web.">
         <RowLink icon="refresh" iconBg="#8E8E93" label="Last refresh" value={timeAgo(d.meta?.last_refresh)} chevron={false} />

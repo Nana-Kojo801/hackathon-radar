@@ -159,3 +159,10 @@ A small static FX table (`normalize.FX_TO_USD`) converts INR/EUR/CAD/etc. right 
 - **"Listed"** (the denominator of "you register for X%") is every visible hackathon seen by the radar since your first activity, plus anything you tracked.
 - **Charts are hand-drawn SVG and HTML** (`components/charts.tsx`), not a library: there are only a few shapes, they need to match the app's look and theme, and a chart library would roughly double the bundle. Marks follow one spec: 4px rounded data-ends on a square baseline, hairline grids, the accent for "you", a recessive grey for comparisons, one-hue heat maps, values in label colours. The four-colour palette for "How you get here" was checked for colour-blind separation in both themes. Every chart can be tapped (or hovered) for exact values.
 - **Market stats are public** and go into the snapshot like the list, so that tab loads instantly and works on a device that isn't connected.
+
+## Refresh now
+
+- **It starts the GitHub workflow, not a run on Render.** The secrets, the alert step and the snapshot publish all live in Actions, and the free Render instance is small and sleeps. So `POST /me/refresh` dispatches `refresh.yml` with a fine-grained token (`GITHUB_TOKEN`, Actions read and write on this repo only), and refuses while a run is already queued or running.
+- **Progress comes from two places:** GitHub's view of the refresh and publish workflows (queued, running, finished, failed) and the pipeline's own record: each source's row as it finishes, plus `stage` and per-step numbers (`progress`) on the run's `pipeline` row (migration 011). The app polls `GET /me/refresh` every 3 seconds while a run is going and every 30 seconds otherwise, only while Settings is on screen; GitHub's answers are cached for 4 seconds.
+- Scheduled runs show up the same way, so the card is also a live view of the 6-hourly refresh.
+

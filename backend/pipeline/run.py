@@ -1,4 +1,7 @@
-"""Pipeline entry point: sources -> normalize -> dedupe -> upsert -> AI enrich -> AI polish.
+"""Pipeline entry point: sources -> normalize -> dedupe -> upsert -> AI enrich -> AI polish -> artwork.
+
+Each step is recorded on the run's source_runs row (stage, progress) as it goes,
+for the live view behind "Refresh now" in Settings.
 
     python -m pipeline.run                    # full run
     python -m pipeline.run --sources devpost  # only some sources
@@ -10,6 +13,8 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
+
+from psycopg.types.json import Jsonb
 
 from app import db
 
@@ -40,6 +45,20 @@ def _finish_run(conn, run_id: int, **stats) -> None:
             {**stats, "id": run_id},
         )
     conn.commit()
+
+
+def _stage(conn, run_id: int, stage: str, step: str | None = None, stats: dict | None = None) -> None:
+    """Record the step the run is on (and the last step's numbers) for the progress view in Settings."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE source_runs SET stage = %s, progress = progress || %s WHERE id = %s",
+                (stage, Jsonb({step: stats} if step else {}), run_id),
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        log.exception("could not record progress")
 
 
 def run_source(conn, source: Source) -> dict:
@@ -102,6 +121,7 @@ def run_pipeline(only: list[str] | None = None, do_enrich: bool = True) -> dict:
         summary: dict = {"sources": {}}
         available = all_sources()
         sources = [s for s in available if not only or s.name in only]
+        _stage(conn, pipeline_run, "sources", "plan", {"sources": [s.name for s in sources]})
         for source in sources:
             summary["sources"][source.name] = run_source(conn, source)
 
@@ -109,16 +129,21 @@ def run_pipeline(only: list[str] | None = None, do_enrich: bool = True) -> dict:
             store.refresh_statuses(cur)
         conn.commit()
 
+        _stage(conn, pipeline_run, "details")
         summary["details"] = details.run_details(conn, {s.name: s for s in available})
+        _stage(conn, pipeline_run, "enrich", "details", summary["details"])
 
         if do_enrich:
             summary["enrich"] = enrich.run_enrichment(conn, {s.name: s for s in available})
             with conn.cursor() as cur:
                 store.refresh_statuses(cur)  # AI may have filled in dates
             conn.commit()
+            _stage(conn, pipeline_run, "polish", "enrich", summary["enrich"])
             summary["polish"] = polish.run_polish(conn)
+            _stage(conn, pipeline_run, "artwork", "polish", summary["polish"])
 
         summary["artwork"] = artwork.run_artwork(conn)
+        _stage(conn, pipeline_run, "done", "artwork", summary["artwork"])
 
         total_fetched = sum(s["fetched"] for s in summary["sources"].values())
         total_new = sum(s["new"] for s in summary["sources"].values())
