@@ -12,7 +12,7 @@ import { sync, usePersonal } from "./lib/personal";
 import { setBadge } from "./lib/push";
 import { goBack, type Overlay, parse, TAB_PATH, type Tab, usePath } from "./lib/router";
 import { flush as flushActivity, startActivityLog } from "./lib/stats";
-import { currentOffset, fade, slide } from "./lib/transition";
+import { currentOffset, fade, reducedMotion, slide } from "./lib/transition";
 import { cn } from "./lib/utils";
 import { type AppData, DataContext } from "./lib/store";
 import { AppearancePage } from "./pages/Appearance";
@@ -164,12 +164,50 @@ export default function App() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Switching tabs slides the pages sideways, in the tab bar's direction. The
+  // tab being left stays visible ("leaving") until its slide ends.
+  const mains = useRef<Partial<Record<Tab, HTMLElement | null>>>({});
+  const [tabs, setTabs] = useState<{ current: Tab; leaving: Tab | null }>({ current: route.tab, leaving: null });
+  if (tabs.current !== route.tab) setTabs({ current: route.tab, leaving: route.overlay || reducedMotion() ? null : tabs.current });
+  const endSlide = useRef<((finished?: boolean) => void) | null>(null);
+
   useLayoutEffect(() => {
-    if (shownTab.current !== route.tab) {
-      shownTab.current = route.tab;
-      window.scrollTo(0, scrolls.current[route.tab] ?? 0);
+    if (shownTab.current === route.tab) return;
+    const from = shownTab.current;
+    shownTab.current = route.tab;
+    const outEl = tabs.leaving === from ? mains.current[from] : null;
+    const inEl = mains.current[route.tab];
+    // A slide still running (a quick second tap) jumps to its end first.
+    const startX = inEl && outEl && endSlide.current ? currentOffset(outEl) : 0;
+    endSlide.current?.(false);
+    const outScroll = scrolls.current[from] ?? 0;
+    const inScroll = scrolls.current[route.tab] ?? 0;
+    if (outEl) {
+      // Pinned where it was, out of the flow, so the incoming tab can restore its own scroll.
+      Object.assign(outEl.style, { position: "fixed", top: `${-outScroll}px`, left: "0", right: "0", pointerEvents: "none" });
+      outEl.style.setProperty("--tab-scroll", `${outScroll}px`);
     }
-  }, [route.tab]);
+    window.scrollTo(0, inScroll);
+    if (!outEl || !inEl) return;
+    inEl.style.setProperty("--tab-scroll", `${inScroll}px`);
+    const dir = TAB_ORDER.indexOf(route.tab) > TAB_ORDER.indexOf(from) ? 1 : -1;
+    const w = window.innerWidth;
+    const reset = (finished = true) => {
+      // When the slide ends, hide the old tab in the same frame its pinning comes off (waiting for
+      // React's re-render would drop it back into the page for a frame). When a new switch cuts
+      // in, React has already set which tabs show, and this one may be the tab coming back.
+      if (finished) outEl.hidden = true;
+      for (const el of [outEl, inEl]) {
+        el.getAnimations().forEach((a) => a.cancel());
+        for (const k of ["position", "top", "left", "right", "pointer-events", "transform", "--tab-scroll"]) el.style.removeProperty(k);
+      }
+      endSlide.current = null;
+      setTabs((t) => (t.leaving === from ? { ...t, leaving: null } : t));
+    };
+    endSlide.current = reset;
+    slide(outEl, "x", startX, -dir * w, "page");
+    slide(inEl, "x", dir * w + startX, 0, "page", () => reset());
+  }, [route.tab, tabs.leaving]);
 
   const onReselect = useCallback((t: Tab) => {
     if (t === shownTab.current) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -215,7 +253,14 @@ export default function App() {
       <MotionConfig reducedMotion="user">
         <div ref={under} className="min-h-dvh">
           {TAB_ORDER.filter((t) => visited.has(t)).map((t) => (
-            <main key={t} hidden={t !== route.tab} className="mx-auto max-w-[720px]">
+            <main
+              key={t}
+              ref={(el) => {
+                mains.current[t] = el;
+              }}
+              hidden={t !== route.tab && t !== tabs.leaving}
+              className="mx-auto max-w-[720px]"
+            >
               <TabActiveContext.Provider value={t === route.tab}>{TAB_PAGES[t]}</TabActiveContext.Provider>
             </main>
           ))}

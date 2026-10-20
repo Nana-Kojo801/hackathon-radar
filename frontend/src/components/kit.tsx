@@ -165,7 +165,8 @@ export function LargeTitle({ eyebrow, title, subtitle, accessory }: { eyebrow?: 
 /** The slim bar that fades in once the large title scrolls away. */
 export function CompactBar({ title, show, left, right }: { title: string; show: boolean; left?: ReactNode; right?: ReactNode }) {
   return (
-    <div aria-hidden={!show} className={cn("fixed inset-x-0 top-0 z-30", !show && "pointer-events-none")}>
+    // While its tab slides, the tab (transformed) becomes what "fixed" is relative to; --tab-scroll keeps the bar at the top of the screen.
+    <div aria-hidden={!show} className={cn("fixed inset-x-0 top-[var(--tab-scroll,0px)] z-30", !show && "pointer-events-none")}>
       <BarBacking show={show} />
       <div className="relative px-4 pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-11 max-w-[720px] items-center justify-between gap-3">
