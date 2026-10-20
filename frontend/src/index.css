@@ -329,27 +329,28 @@
   .hairline {
     border-color: var(--sep);
   }
-  /* Bars that frost in on scroll (kit.tsx BarBacking): the blur and tint transition, never the opacity. */
+  /*
+   * Bars that appear on scroll (kit.tsx BarBacking). No backdrop-filter here:
+   * Safari flickers when anything about a blurred backdrop animates (its
+   * opacity, or the blur itself), so the bar is a solid fill (a see-through
+   * one without blur lets text ghost through) that fades with plain opacity,
+   * on a layer that stays composited throughout.
+   */
   .bar-backing {
-    border-color: transparent;
-    background: color-mix(in srgb, var(--bg) 0%, transparent);
-    -webkit-backdrop-filter: blur(0px) saturate(100%);
-    backdrop-filter: blur(0px) saturate(100%);
-    transition:
-      background-color 0.28s ease,
-      border-color 0.28s ease,
-      -webkit-backdrop-filter 0.28s ease,
-      backdrop-filter 0.28s ease;
+    border-color: var(--sep);
+    background: var(--bg);
+    opacity: 0;
+    transform: translateZ(0);
+    will-change: opacity;
+    transition: opacity 0.22s ease;
   }
   .bar-backing[data-show] {
-    border-color: var(--sep);
-    background: color-mix(in srgb, var(--bg) 80%, transparent);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
+    opacity: 1;
   }
   .bar-title {
     opacity: 0;
     transform: translateY(5px);
+    will-change: opacity, transform;
     transition:
       opacity 0.22s ease,
       transform 0.32s var(--ease-pop);

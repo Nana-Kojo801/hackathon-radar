@@ -121,11 +121,7 @@ export function useScrolled(threshold = 44, ref?: RefObject<HTMLElement | null>)
   return scrolled;
 }
 
-/**
- * The frosted backing of a bar that appears on scroll. The blur and tint
- * transition themselves; fading the element's opacity instead makes WebKit
- * drop the blur mid-fade and snap it back, which shows as a flicker.
- */
+/** The backing of a bar that appears on scroll (styled in index.css: no blur, so Safari can't flicker it). */
 export function BarBacking({ show }: { show: boolean }) {
   return (
     <div
