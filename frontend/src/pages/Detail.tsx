@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { Icon, type IconName } from "../components/Icon";
+import { ClaudeMark, Icon, type IconName } from "../components/Icon";
 import { GlassButton, Menu, Thumb } from "../components/kit";
 import { OverlayPage } from "../components/OverlayPage";
 import { fromPlatform, Prizes } from "../components/Prizes";
@@ -329,7 +329,7 @@ function Facts({ h, detail }: { h: Hackathon; detail: HackathonDetail | null }) 
 }
 
 const STEPS: { value: Stage; label: string; icon: IconName }[] = [
-  { value: "saved", label: "Interested", icon: "bookmark" },
+  { value: "saved", label: "Saved", icon: "bookmark" },
   { value: "registered", label: "Registered", icon: "ticket" },
   { value: "submitted", label: "Submitted", icon: "send" },
   { value: "won", label: "Result", icon: "trophy" },
@@ -351,13 +351,46 @@ function progressLine(h: Hackathon, stage: Stage | null): string {
     case "not_placed":
       return "Didn't place this time. On to the next one.";
     default:
-      return "Tap a stage to track this hackathon.";
+      return "Track it here: save it, then mark each step as you go.";
   }
 }
 
+/** The one thing to do next, as a big button (two for the result). */
+function NextStep({ stage, set }: { stage: Stage | null; set: (s: Stage) => void }) {
+  const big = "flex h-12 flex-1 items-center justify-center gap-2 rounded-full text-callout font-semibold";
+  // A result is the end of the road; the gold (or plain) result node says it.
+  if (stage === "won" || stage === "not_placed") return null;
+  if (stage === "submitted")
+    return (
+      <div className="mt-3.5 flex gap-2.5">
+        <motion.button type="button" whileTap={press} transition={bouncy} onClick={() => set("won")} className={cn(big, "bg-[var(--gold-bg)] text-[var(--gold-fg)] shadow-[inset_0_0_0_1px_var(--gold-ring)]")}>
+          <Icon name="trophy" size={19} filled />
+          Won
+        </motion.button>
+        <motion.button type="button" whileTap={press} transition={bouncy} onClick={() => set("not_placed")} className={cn(big, "bg-fill text-label")}>
+          <Icon name="flag" size={19} />
+          Didn't place
+        </motion.button>
+      </div>
+    );
+  const next: { stage: Stage; label: string; icon: IconName } =
+    stage === "registered"
+      ? { stage: "submitted", label: "I've submitted", icon: "send" }
+      : stage === "saved"
+        ? { stage: "registered", label: "I've registered", icon: "ticket" }
+        : { stage: "saved", label: "I'm interested", icon: "bookmark" };
+  return (
+    <motion.button type="button" whileTap={press} transition={bouncy} onClick={() => set(next.stage)} className={cn(big, "mt-3.5 w-full bg-accent text-on-accent")}>
+      <Icon name={next.icon} size={19} filled />
+      {next.label}
+    </motion.button>
+  );
+}
+
 /**
- * Where you are with this hackathon: four big stage tiles. The current one is
- * filled with the accent, earlier ones are ticked off, later ones wait.
+ * Where you are with this hackathon: a stepper (tap a stage to jump to it), a
+ * line on where things stand, and one big button for the next step, so the
+ * card reads at a glance on a phone instead of packing four tiles into a row.
  */
 function TrackCard({ h }: { h: Hackathon }) {
   const personal = usePersonal();
@@ -385,55 +418,64 @@ function TrackCard({ h }: { h: Hackathon }) {
     if (s === "won") toast("Congratulations!", "check");
     else if (s) toast(`Marked ${s === "saved" ? "Interested" : s === "not_placed" ? "Didn't place" : s.charAt(0).toUpperCase() + s.slice(1)}`, "check");
   };
-
-  const tile = (s: (typeof STEPS)[number], i: number) => {
-    const current = i === at;
-    const done = i < at;
-    const label = i === 3 ? (stage === "won" ? "Won" : stage === "not_placed" ? "Didn't place" : s.label) : s.label;
-    const icon: IconName = i === 3 && stage === "not_placed" ? "flag" : s.icon;
-    return (
-      <motion.button
-        type="button"
-        role="radio"
-        aria-checked={current}
-        whileTap={{ scale: 0.92 }}
-        transition={bouncy}
-        onClick={i === 3 ? undefined : () => set(current ? null : s.value)}
-        className={cn(
-          "relative flex h-[76px] w-full flex-col items-center justify-center gap-1.5 rounded-[18px] px-1 transition-colors duration-200",
-          current ? "bg-accent text-on-accent shadow-[0_8px_20px_-8px_var(--accent)]" : done ? "bg-soft text-ink" : "bg-fill text-label",
-        )}
-      >
-        <motion.span key={`${current}`} initial={current ? { scale: 0.6 } : false} animate={{ scale: 1 }} transition={bouncy} className="flex">
-          <Icon name={icon} size={22} stroke={2} filled={current && (icon === "bookmark" || icon === "trophy")} />
-        </motion.span>
-        <span className={cn("max-w-full truncate text-[calc(12.5px*var(--ts))] leading-none", current ? "font-bold" : "font-semibold")}>{label}</span>
-        {done && (
-          <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-on-accent">
-            <Icon name="check" size={10} stroke={3.4} />
-          </span>
-        )}
-      </motion.button>
-    );
-  };
+  const resultLabel = stage === "won" ? "Won" : stage === "not_placed" ? "Didn't place" : "Result";
 
   return (
     <section className="card mx-4 mt-5 overflow-hidden rounded-[22px]">
-      <div className="px-4 pt-4 pb-4">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-body font-semibold">Your progress</h2>
-          {stage && stage !== "hidden" && (
-            <button type="button" onClick={() => set(null)} className="text-subhead font-medium text-tint">
+      <div className="p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-headline font-semibold tracking-[-0.02em]">Your progress</h2>
+          {at >= 0 && (
+            <button type="button" onClick={() => set(null)} className="text-footnote font-medium text-label-2">
               Clear
             </button>
           )}
         </div>
-        <p className="mt-0.5 text-subhead text-label-2">{progressLine(h, stage === "hidden" ? null : stage)}</p>
-        <div role="radiogroup" aria-label="Stage" className="mt-3.5 grid grid-cols-4 gap-2">
-          {STEPS.map((s, i) =>
-            i === 3 ? (
+
+        {/* The stepper: a line that fills up to the current stage, a node per stage. */}
+        <div role="radiogroup" aria-label="Stage" className="relative mt-4 grid grid-cols-4">
+          <span aria-hidden="true" className="absolute top-[15px] right-[12.5%] left-[12.5%] h-[3px] rounded-full bg-fill" />
+          <span
+            aria-hidden="true"
+            className="absolute top-[15px] left-[12.5%] h-[3px] rounded-full bg-accent transition-[width] duration-500 ease-out"
+            style={{ width: `${(Math.max(0, at) / 3) * 75}%` }}
+          />
+          {STEPS.map((st, i) => {
+            const done = i < at;
+            const current = i === at;
+            const label = i === 3 ? resultLabel : st.label;
+            const icon: IconName = i === 3 && stage === "not_placed" ? "flag" : st.icon;
+            const node = (
+              <motion.button
+                type="button"
+                role="radio"
+                aria-checked={current}
+                aria-label={label}
+                whileTap={{ scale: 0.88 }}
+                transition={bouncy}
+                onClick={i === 3 ? undefined : () => set(current ? null : st.value)}
+                className="relative z-[1] flex w-full flex-col items-center gap-1.5"
+              >
+                <motion.span
+                  key={`${current}-${done}`}
+                  initial={current ? { scale: 0.7 } : false}
+                  animate={{ scale: 1 }}
+                  transition={bouncy}
+                  className={cn(
+                    "flex h-[33px] w-[33px] items-center justify-center rounded-full transition-colors duration-200",
+                    done && "bg-accent text-on-accent",
+                    current && (stage === "won" ? "bg-[var(--gold-bg)] text-[var(--gold-fg)] shadow-[0_0_0_2px_var(--gold-ring)]" : "bg-accent text-on-accent shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_22%,transparent)]"),
+                    !done && !current && "bg-card-2 text-label-3 shadow-[inset_0_0_0_1.5px_var(--sep)]",
+                  )}
+                >
+                  {done ? <Icon name="check" size={16} stroke={2.6} /> : <Icon name={icon} size={17} filled={current} />}
+                </motion.span>
+                <span className={cn("max-w-full truncate px-0.5 text-[calc(12px*var(--ts))] leading-none", current ? "font-bold text-label" : done ? "font-semibold text-label" : "font-medium text-label-2")}>{label}</span>
+              </motion.button>
+            );
+            return i === 3 ? (
               <Menu
-                key={s.value}
+                key={st.value}
                 title="How did it go?"
                 value={stage === "won" || stage === "not_placed" ? stage : undefined}
                 items={[
@@ -441,13 +483,17 @@ function TrackCard({ h }: { h: Hackathon }) {
                   { value: "not_placed", label: "Didn't place", icon: "flag" },
                 ]}
                 onSelect={(v) => set(v as Stage)}
-                trigger={<div>{tile(s, i)}</div>}
+                trigger={<div>{node}</div>}
               />
             ) : (
-              <div key={s.value}>{tile(s, i)}</div>
-            ),
-          )}
+              <div key={st.value}>{node}</div>
+            );
+          })}
         </div>
+
+        <p className="mt-4 text-subhead leading-snug text-label-2">{progressLine(h, stage === "hidden" ? null : stage)}</p>
+
+        <NextStep stage={stage === "hidden" ? null : stage} set={set} />
       </div>
       <div className="border-t hairline">
         {editing ? (
@@ -504,8 +550,9 @@ function ClaudeCard({ detail }: { detail: HackathonDetail | null }) {
           disabled={!detail}
           className="card mx-4 mt-3 flex w-[calc(100%-32px)] items-center gap-3.5 rounded-[22px] px-4 py-3.5 text-left disabled:opacity-60"
         >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] text-white" style={{ background: "linear-gradient(145deg, #E8875E 0%, #C2581F 100%)" }}>
-            <Icon name="sparkle" size={24} filled />
+          {/* Claude's mark on a warm cream tile, like its app icon. */}
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#F4F1EA] shadow-[inset_0_0_0_0.5px_rgba(0,0,0,0.08)]">
+            <ClaudeMark size={26} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-callout font-semibold">Brainstorm ideas with Claude</span>

@@ -154,7 +154,7 @@ How it behaves:
 - **Going back** returns you to the same place in the list; each tab keeps its own scroll position, and your filters are kept.
 - **Speed:** filtering, sorting and search all happen in the browser, so they respond instantly.
 
-**Icons** are [Phosphor](https://phosphoricons.com) (MIT): `frontend/scripts/icons.mjs` copies the ones the app uses, in regular, bold and fill weights, into `src/components/icons.generated.ts`. To add one, add it to the script's list and run it against the `@phosphor-icons/core` package (instructions at the top of the script).
+**Icons** are [Phosphor](https://phosphoricons.com) (MIT): `frontend/scripts/icons.mjs` copies the ones the app uses, in regular, bold and fill weights, into `src/components/icons.generated.ts`. To add one, add it to the script's list and run it against the `@phosphor-icons/core` package (instructions at the top of the script). The Claude mark on the brainstorm card is from [Simple Icons](https://simpleicons.org) (CC0).
 
 ## Personal features
 
