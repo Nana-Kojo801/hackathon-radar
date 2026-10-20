@@ -20,7 +20,7 @@ import {
 import { categoryLabel } from "../lib/format";
 import { bouncy, press } from "../lib/motion";
 import { usePersonal } from "../lib/personal";
-import { takeSearchFocus, useData } from "../lib/store";
+import { SEARCH_FOCUS_EVENT, takeSearchFocus, useData } from "../lib/store";
 import { cn } from "../lib/utils";
 
 const PAGE = 30;
@@ -48,7 +48,11 @@ export function Explore() {
   }, [listKey]);
 
   useEffect(() => {
-    if (takeSearchFocus()) window.setTimeout(() => search.current?.focus(), 250);
+    // After the tab has switched to Explore, so the field is visible.
+    const focus = () => takeSearchFocus() && window.setTimeout(() => search.current?.focus(), 250);
+    focus();
+    window.addEventListener(SEARCH_FOCUS_EVENT, focus);
+    return () => window.removeEventListener(SEARCH_FOCUS_EVENT, focus);
   }, []);
 
   // Render 30 at a time; the next 30 come in before you reach the end.

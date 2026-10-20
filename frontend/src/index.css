@@ -406,21 +406,6 @@
   }
 }
 
-/* Switching tabs: a quick fade-in. */
-@keyframes tab-enter {
-  from {
-    opacity: 0;
-  }
-}
-.tab-enter {
-  animation: tab-enter 0.2s ease-out;
-}
-@media (prefers-reduced-motion: reduce) {
-  .tab-enter {
-    animation: none;
-  }
-}
-
 /*
  * Switching segments and tabs inside a page (Saved, Stats, prize groups): the
  * new content slides in; the old one just goes. Animating the old one out as

@@ -1,7 +1,7 @@
 import { MotionConfig } from "framer-motion";
 import { lazy, type PointerEvent, type ReactNode, type RefObject, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { ToastView } from "./components/kit";
+import { TabActiveContext, ToastView } from "./components/kit";
 import { TabBar } from "./components/TabBar";
 import { fetchData, fetchJSON, type Hackathon, type Meta } from "./lib/api";
 import { appearance, useAppearance } from "./lib/appearance";
@@ -25,6 +25,9 @@ import { SettingsTab } from "./pages/Settings";
 import { Today } from "./pages/Today";
 
 // The stats page and its charts load on first visit, keeping them out of the start-up bundle.
+const TAB_ORDER: Tab[] = ["today", "explore", "saved", "settings"];
+const TAB_PAGES: Record<Tab, ReactNode> = { today: <Today />, explore: <Explore />, saved: <Saved />, settings: <SettingsTab /> };
+
 const StatsPage = lazy(() => import("./pages/Stats").then((m) => ({ default: m.StatsPage })));
 
 interface ListResponse {
@@ -188,11 +191,11 @@ export default function App() {
   }, [route.key, route.overlay]);
   const gone = useCallback((key: string) => setLayers((prev) => prev.filter((l) => l.key !== key)), []);
 
-  let page: ReactNode;
-  if (route.tab === "today") page = <Today />;
-  else if (route.tab === "explore") page = <Explore />;
-  else if (route.tab === "saved") page = <Saved />;
-  else page = <SettingsTab />;
+  // Tabs stay mounted once visited and switch instantly, like iOS: remounting
+  // on every switch reloaded every image and replayed every entrance
+  // animation, and fading the page in glitched its glass in Safari.
+  const [visited, setVisited] = useState<Set<Tab>>(() => new Set([route.tab]));
+  if (!visited.has(route.tab)) setVisited(new Set(visited).add(route.tab));
 
   const render = (o: Overlay): ReactNode => {
     if (o.kind === "detail") return <Detail id={o.id} initial={live.get(o.id) ?? personal.items[o.id]?.hackathon} />;
@@ -211,9 +214,11 @@ export default function App() {
     <DataContext.Provider value={data}>
       <MotionConfig reducedMotion="user">
         <div ref={under} className="min-h-dvh">
-          <main key={route.tab} className="tab-enter mx-auto max-w-[720px]">
-            {page}
-          </main>
+          {TAB_ORDER.filter((t) => visited.has(t)).map((t) => (
+            <main key={t} hidden={t !== route.tab} className="mx-auto max-w-[720px]">
+              <TabActiveContext.Provider value={t === route.tab}>{TAB_PAGES[t]}</TabActiveContext.Provider>
+            </main>
+          ))}
         </div>
         <div ref={dim} aria-hidden="true" style={{ opacity: 0, background: "var(--scrim)" }} className="pointer-events-none fixed inset-0 z-40" />
         <TabBar active={route.tab} hidden={!!route.overlay} badge={closingSaved} onReselect={onReselect} />

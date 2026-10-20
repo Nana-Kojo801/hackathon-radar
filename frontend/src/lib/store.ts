@@ -30,10 +30,12 @@ export function useData(): AppData {
   return d;
 }
 
-/** Ask Explore to focus its search field when it next shows. */
+/** Ask Explore to focus its search field when it next shows (it stays mounted, so it listens too). */
 let focusSearch = false;
+export const SEARCH_FOCUS_EVENT = "radar:search-focus";
 export function requestSearchFocus(): void {
   focusSearch = true;
+  window.dispatchEvent(new Event(SEARCH_FOCUS_EVENT));
 }
 export function takeSearchFocus(): boolean {
   const v = focusSearch;

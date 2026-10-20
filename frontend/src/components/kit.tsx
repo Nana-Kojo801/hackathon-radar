@@ -1,7 +1,7 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
 import { AnimatePresence, motion } from "framer-motion";
-import { type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createContext, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { Hackathon } from "../lib/api";
 import { dueTag, fallbackArt, imageOf, logoOf } from "../lib/format";
@@ -107,9 +107,15 @@ export function PrimaryButton({
  */
 export function useScrolled(threshold = 44, ref?: RefObject<HTMLElement | null>): boolean {
   const [scrolled, setScrolled] = useState(false);
+  // Tabs stay mounted while hidden and share the window's scroll; a hidden tab
+  // ignores it, so it comes back exactly as it was left (its scroll is restored).
+  const active = useContext(TabActiveContext);
+  const live = useRef(active);
+  live.current = active;
   useEffect(() => {
     const el = ref?.current;
     const read = () => {
+      if (!el && !live.current) return;
       const y = el ? el.scrollTop : window.scrollY;
       setScrolled((was) => (was ? y > threshold - 12 : y > threshold));
     };
@@ -120,6 +126,9 @@ export function useScrolled(threshold = 44, ref?: RefObject<HTMLElement | null>)
   }, [threshold, ref]);
   return scrolled;
 }
+
+/** Whether the tab a component lives in is the one showing (App provides it). */
+export const TabActiveContext = createContext(true);
 
 /** The backing of a bar that appears on scroll (styled in index.css: no blur, so Safari can't flicker it). */
 export function BarBacking({ show }: { show: boolean }) {
