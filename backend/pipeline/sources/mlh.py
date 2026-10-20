@@ -83,4 +83,6 @@ class MLHSource(Source):
             student_only=True,
             international_ok=True if fmt == "online" else None,
             image_url=e.get("logoUrl") or e.get("backgroundUrl"),
+            icon_url=e.get("logoUrl"),
+            banner_url=e.get("backgroundUrl"),
         )

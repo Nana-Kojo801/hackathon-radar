@@ -24,13 +24,14 @@ ITEM_COLUMNS = """
     h.id, h.source, h.source_url, h.alt_urls, h.title, h.organizer, h.summary,
     CASE WHEN h.image_url IS NULL OR h.image_url ~* 'placeholder|default[-_]?thumbnail'
          THEN COALESCE(h.page_image_url, h.image_url) ELSE h.image_url END AS image_url, h.logo_url,
+    h.icon_url, COALESCE(h.banner_url, h.page_image_url) AS banner_url,
     h.prize_text, h.prize_usd::float AS prize_usd, h.prize_confidence, h.prize_notes,
     h.format, h.location_text, h.categories, h.international_ok, h.student_only,
     h.start_date, h.end_date, h.registration_deadline, h.status AS event_status, h.relevance_score,
     h.first_seen_at, h.last_seen_at, (h.enriched_at IS NOT NULL) AS enriched
 """
 HACKATHON_KEYS = (
-    "id", "source", "source_url", "alt_urls", "title", "organizer", "summary", "image_url", "logo_url",
+    "id", "source", "source_url", "alt_urls", "title", "organizer", "summary", "image_url", "logo_url", "icon_url", "banner_url",
     "prize_text", "prize_usd", "prize_confidence", "prize_notes", "format", "location_text",
     "categories", "international_ok", "student_only", "start_date", "end_date",
     "registration_deadline", "relevance_score", "first_seen_at", "last_seen_at", "enriched",

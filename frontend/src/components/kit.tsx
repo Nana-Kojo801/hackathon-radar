@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { createContext, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { Hackathon } from "../lib/api";
-import { dueTag, fallbackArt, imageOf, logoOf } from "../lib/format";
+import { dueTag, fallbackArt, iconOf } from "../lib/format";
 import { bouncy, press, pressSmall, spring } from "../lib/motion";
 import { slide } from "../lib/transition";
 import { type Stage, stageLabel } from "../lib/personal";
@@ -621,17 +621,16 @@ export function StageTag({ status, className }: { status: Stage; className?: str
 
 /** The listing's own art, else the organizer's logo on a white tile, else a gradient tile with a glyph. */
 export function Thumb({ h, size, radius, className, contain }: { h: Hackathon; size: number; radius?: number; className?: string; contain?: boolean }) {
-  const cover = imageOf(h);
-  const logo = logoOf(h);
+  const art = iconOf(h);
   const [failed, setFailed] = useState(false);
-  const art = fallbackArt(h);
+  const glyph = fallbackArt(h);
   const r = radius ?? Math.round(size * 0.24);
-  const src = failed ? null : (cover ?? logo);
-  const isLogo = !cover && !!logo;
+  const src = failed ? null : (art?.src ?? null);
+  const isLogo = !!art?.logo;
   return (
     <span
       className={cn("thumb-line relative flex shrink-0 items-center justify-center overflow-hidden text-white", className)}
-      style={{ width: size, height: size, borderRadius: r, background: src ? (isLogo ? "#fff" : "var(--card)") : art.gradient }}
+      style={{ width: size, height: size, borderRadius: r, background: src ? (isLogo ? "#fff" : "var(--card)") : glyph.gradient }}
     >
       {src ? (
         <img
@@ -644,7 +643,7 @@ export function Thumb({ h, size, radius, className, contain }: { h: Hackathon; s
         />
       ) : (
         <svg width={size * 0.46} height={size * 0.46} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d={art.glyph} />
+          <path d={glyph.glyph} />
         </svg>
       )}
     </span>

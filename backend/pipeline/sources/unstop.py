@@ -145,5 +145,6 @@ def to_listing(item: dict) -> RawListing | None:
         format=fmt,
         student_only=_student_only(item),
         image_url=item.get("logoUrl2") or (item.get("organisation") or {}).get("logoUrl"),
+        icon_url=item.get("logoUrl2") or (item.get("organisation") or {}).get("logoUrl"),
         prizes=prizes,
     )

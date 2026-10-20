@@ -33,6 +33,10 @@ class RawListing:
     international_ok: bool | None = None
     student_only: bool | None = None
     image_url: str | None = None
+    # Square artwork (a logo or thumbnail) and wide artwork (a cover or header photo), when the
+    # source tells them apart; image_url stays the one image for anything that wants just one.
+    icon_url: str | None = None
+    banner_url: str | None = None
     # Prize breakdown: [{"name", "amount_text", "amount_usd" (per winner), "winners", "perks"}]
     prizes: list[dict] = field(default_factory=list)
 

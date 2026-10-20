@@ -100,6 +100,8 @@ class DevfolioSource(Source):
             format=fmt,
             categories=map_themes(themes),
             image_url=h.get("cover_img") or settings.get("logo"),
+            icon_url=settings.get("logo"),
+            banner_url=h.get("cover_img"),
             prizes=_prizes(d.get("prizeDetails") or []),
         )
 

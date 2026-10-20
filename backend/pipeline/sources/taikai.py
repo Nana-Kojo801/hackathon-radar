@@ -112,4 +112,5 @@ def to_listing(c: dict, now: datetime | None = None) -> RawListing | None:
         prize_confidence="high" if prize_usd else None,
         categories=[],
         image_url=image,
+        banner_url=(c.get("coverImageFile") or {}).get("url"),
     )

@@ -52,7 +52,7 @@ DECISIONS.md      choices that differ from (or fill gaps in) the spec
 | `MAX_ENRICH_PER_RUN` | optional | default 60 AI calls per run |
 | `MAX_DISCOVERY_PAGES` | optional | default 12 web pages sent to the AI per run |
 | `MAX_POLISH_PER_RUN` | optional | default 40 descriptions tidied by the AI per run |
-| `MAX_ARTWORK_PER_RUN` | optional | default 40 listings per run looked up for a cover or organizer logo |
+| `MAX_ARTWORK_PER_RUN` | optional | default 60 listings per run looked up for a banner or organizer logo |
 | `ALLOWED_ORIGINS` | Render | comma-separated, e.g. `https://hackathon-radar.pages.dev,http://localhost:5173` |
 | `VITE_API_URL` | Cloudflare Pages (build env) | your Render URL, e.g. `https://hackathon-radar-api.onrender.com` |
 

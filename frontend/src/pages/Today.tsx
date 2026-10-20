@@ -7,7 +7,7 @@ import { WeekRecap } from "../components/StatsTeasers";
 import { meta } from "../components/HackRow";
 import type { Hackathon } from "../lib/api";
 import { DEFAULT_FILTERS, type Filters } from "../lib/filters";
-import { daysLeft, imageOf, isNew, logoOf, prizeFull, prizeShort, todayLong, weekday, weekdayDate, fallbackArt, dueTag } from "../lib/format";
+import { bannerOf, daysLeft, iconOf, isNew, prizeFull, prizeShort, todayLong, weekday, weekdayDate, fallbackArt, dueTag } from "../lib/format";
 import { press, rise, spring } from "../lib/motion";
 import { type Stage, usePersonal } from "../lib/personal";
 import { linkTo, navigate } from "../lib/router";
@@ -244,13 +244,18 @@ function DeadlineCard({ h, status, days, index }: { h: Hackathon; status: Stage;
   );
 }
 
-/** Wide covers fill the card; square logos (and organizer logos) sit on a blurred wash of themselves. */
+/** A wide banner fills the card; otherwise the square icon sits on a blurred wash of itself. */
 function Hero({ h }: { h: Hackathon }) {
-  const logo = logoOf(h);
-  const src = imageOf(h) ?? logo;
-  const [wide, setWide] = useState<boolean | null>(null);
+  const [bannerFailed, setBannerFailed] = useState(false);
   const [failed, setFailed] = useState(false);
+  const banner = bannerFailed ? null : bannerOf(h);
+  const icon = iconOf(h);
+  // Without a banner: an icon image that turns out wide fills the card too.
+  const [iconWide, setIconWide] = useState<boolean | null>(null);
+  const wide = banner ? true : iconWide;
   const art = fallbackArt(h);
+  const src = banner ?? (failed ? null : (icon?.src ?? null));
+  const isLogo = !banner && !!icon?.logo;
   return (
     <motion.a
       href={`/h/${h.id}`}
@@ -261,20 +266,20 @@ function Hero({ h }: { h: Hackathon }) {
       whileTap={press}
       className="card mx-4 block overflow-hidden rounded-[26px]"
     >
-      <div className="relative h-[184px] overflow-hidden" style={{ background: src && !failed ? "var(--card-2)" : art.gradient }}>
-        {src && !failed ? (
+      <div className="relative h-[184px] overflow-hidden" style={{ background: src ? "var(--card-2)" : art.gradient }}>
+        {src ? (
           <>
             {wide === false && <img src={src} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-125 object-cover opacity-70 blur-2xl saturate-150" />}
             <img
               src={src}
               alt=""
-              onLoad={(e) => setWide(!logo && e.currentTarget.naturalWidth / e.currentTarget.naturalHeight > 1.35)}
-              onError={() => setFailed(true)}
+              onLoad={(e) => !banner && setIconWide(!isLogo && e.currentTarget.naturalWidth / e.currentTarget.naturalHeight > 1.35)}
+              onError={() => (banner ? setBannerFailed(true) : setFailed(true))}
               className={cn(
                 wide === false
                   ? cn(
                       "absolute top-1/2 left-1/2 h-[128px] w-[128px] -translate-x-1/2 -translate-y-1/2 rounded-[28px] shadow-[0_12px_30px_-8px_rgba(0,0,0,0.45)]",
-                      logo ? "bg-white object-contain p-5" : "object-cover",
+                      isLogo ? "bg-white object-contain p-5" : "object-cover",
                     )
                   : "absolute inset-0 h-full w-full object-cover",
                 wide === null && "opacity-0",

@@ -50,12 +50,12 @@ def _insert(cur, n: Normalized) -> None:
     cur.execute(
         """
         INSERT INTO hackathons (
-            source, source_url, title, title_key, organizer, description_raw, image_url,
+            source, source_url, title, title_key, organizer, description_raw, image_url, icon_url, banner_url,
             prize_text, prize_usd, prize_confidence, format, location_text, categories,
             international_ok, student_only, start_date, end_date, registration_deadline,
             dates_text, content_hash, hints, raw_payload, prizes
         ) VALUES (
-            %(source)s, %(url)s, %(title)s, %(key)s, %(org)s, %(desc)s, %(img)s,
+            %(source)s, %(url)s, %(title)s, %(key)s, %(org)s, %(desc)s, %(img)s, %(icon)s, %(banner)s,
             %(prize_text)s, %(prize_usd)s, %(prize_conf)s, %(format)s, %(loc)s, %(cats)s,
             %(intl)s, %(student)s, %(start)s, %(end)s, %(deadline)s,
             %(dates_text)s, %(hash)s, %(hints)s, %(raw)s, %(prizes)s
@@ -64,6 +64,7 @@ def _insert(cur, n: Normalized) -> None:
         {
             "source": r.source, "url": n.source_url, "title": r.title, "key": n.title_key,
             "org": r.organizer, "desc": r.description, "img": r.image_url,
+            "icon": r.icon_url, "banner": r.banner_url,
             "prize_text": r.prize_text, "prize_usd": r.prize_usd,
             "prize_conf": r.prize_confidence if r.prize_usd is not None else None,
             "format": r.format or "unknown", "loc": r.location_text, "cats": r.categories,
@@ -93,6 +94,8 @@ def _update_primary(cur, row: dict, n: Normalized) -> None:
             organizer = COALESCE(%(org)s, organizer),
             description_raw = COALESCE(%(desc)s, description_raw),
             image_url = COALESCE(%(img)s, image_url),
+            icon_url = COALESCE(%(icon)s, icon_url),
+            banner_url = COALESCE(%(banner)s, banner_url),
             prize_text = %(prize_text)s,
             -- Structured prize/format from the source beat AI guesses.
             prize_usd = COALESCE(%(prize_usd)s, prize_usd),
@@ -121,6 +124,7 @@ def _update_primary(cur, row: dict, n: Normalized) -> None:
         {
             "id": row["id"], "source": r.source, "url": n.source_url, "title": r.title,
             "key": n.title_key, "org": r.organizer, "desc": r.description, "img": r.image_url,
+            "icon": r.icon_url, "banner": r.banner_url,
             "prize_text": r.prize_text, "prize_usd": r.prize_usd,
             "prize_conf": r.prize_confidence or "high", "format": r.format,
             "loc": r.location_text, "cats": r.categories, "intl": r.international_ok,
@@ -148,11 +152,13 @@ def _merge_secondary(cur, row: dict, n: Normalized) -> None:
             end_date = COALESCE(end_date, %(end)s),
             registration_deadline = COALESCE(registration_deadline, %(deadline)s),
             student_only = COALESCE(student_only, %(student)s),
+            icon_url = COALESCE(icon_url, %(icon)s),
+            banner_url = COALESCE(banner_url, %(banner)s),
             last_seen_at = now()
         WHERE id = %(id)s
         """,
         {
-            "id": row["id"], "url": n.source_url, "org": r.organizer,
+            "id": row["id"], "url": n.source_url, "org": r.organizer, "icon": r.icon_url, "banner": r.banner_url,
             "prize_text": r.prize_text, "prize_usd": r.prize_usd, "loc": r.location_text,
             "start": r.start_date, "end": r.end_date, "deadline": r.registration_deadline,
             "student": r.student_only,

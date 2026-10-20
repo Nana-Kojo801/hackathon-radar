@@ -231,10 +231,32 @@ export function logoOf(h: Pick<Hackathon, "image_url" | "logo_url">): string | n
   return imageOf(h) ? null : (h.logo_url ?? null);
 }
 
+const usable = (u: string | null | undefined) => (u && !PLACEHOLDER.test(u) ? u : null);
+
+/**
+ * Artwork for a square spot (list rows, cards): the platform's square icon,
+ * else the organizer's logo (padded on a plain tile, `logo`), else the
+ * listing's one image cropped to fit.
+ */
+export function iconOf(h: Pick<Hackathon, "image_url" | "logo_url" | "icon_url">): { src: string; logo: boolean } | null {
+  const icon = usable(h.icon_url);
+  if (icon) return { src: icon, logo: false };
+  if (h.logo_url) return { src: h.logo_url, logo: true };
+  const img = usable(h.image_url);
+  return img ? { src: img, logo: false } : null;
+}
+
+/** Wide artwork for the top of a hackathon's page. */
+export function bannerOf(h: Pick<Hackathon, "banner_url">): string | null {
+  return usable(h.banner_url);
+}
+
 /** The listing's own image, unless it's a platform placeholder. */
+const PLACEHOLDER = /placeholder|default[-_]?thumbnail/i;
+
 export function imageOf(h: Pick<Hackathon, "image_url">): string | null {
   const u = h.image_url;
-  if (!u || /placeholder|default[-_]?thumbnail/i.test(u)) return null;
+  if (!u || PLACEHOLDER.test(u)) return null;
   return u;
 }
 

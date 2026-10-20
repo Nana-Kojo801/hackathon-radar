@@ -1,26 +1,29 @@
-"""Artwork step: a cover for listings that arrive without one.
+"""Artwork step: a banner and an icon for listings whose platform didn't give them.
 
-Most platforms give each listing an image; web finds and a few others don't.
-For those, in order:
+Each listing can have two kinds of artwork: a wide banner (shown across the top
+of its page) and a square icon (in lists). Platforms give one or both
+(icon_url, banner_url); for what's missing, in order:
 
-1. The share image (og:image / twitter:image) of the hackathon's own page.
-   Aggregator sites often use one image for every event, so an image shared
-   by two or more listings is treated as generic and dropped.
-2. The organizer's logo: the AI names the organizer's official website (one
-   batched call, cached in organizer_sites), and the logo is read from its
-   homepage (apple-touch-icon, a large icon, or the logo in its structured data).
-3. The icon of the hackathon's own site, when it isn't an aggregator's.
+- Banner: the share image (og:image / twitter:image) of the hackathon's own
+  page, if it's wide. Aggregator sites often use one image for every event, so
+  an image shared by two or more listings is treated as generic and dropped.
+- Icon: the organizer's logo. The AI names the organizer's official website
+  (one batched call, cached in organizer_sites) and the logo is read from its
+  homepage (apple-touch-icon, a large icon, or the logo in its structured
+  data); else the icon of the hackathon's own site when it isn't an aggregator.
 
-Every image is checked to load as an image before it's kept. A listing is
-looked at once, and again a week later (three times at most) if nothing was
-found; at most MAX_ARTWORK_PER_RUN per run. The app shows page_image_url as a
-cover (main.py folds it into image_url) and logo_url on a plain tile.
+Every image is checked to load, and its shape read from the first bytes of the
+file, so a square thumbnail never becomes a banner or a banner an icon. A
+listing is looked at once, and again a week later (three times at most) if
+nothing was found; at most MAX_ARTWORK_PER_RUN per run. The results are
+page_image_url (a banner) and logo_url (an icon, drawn on a plain tile).
 """
 
 import json
 import logging
 import os
 import re
+import struct
 from concurrent.futures import ThreadPoolExecutor
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
@@ -32,7 +35,7 @@ from .http import PoliteClient
 
 log = logging.getLogger(__name__)
 
-MAX_ARTWORK_PER_RUN = int(os.getenv("MAX_ARTWORK_PER_RUN", "40") or 40)
+MAX_ARTWORK_PER_RUN = int(os.getenv("MAX_ARTWORK_PER_RUN", "60") or 60)
 MAX_ATTEMPTS = 3
 PAGE_LIMIT = 1_500_000
 
@@ -150,25 +153,76 @@ def read_page(http: PoliteClient, url: str) -> _Head | None:
     return head
 
 
-def is_image(http: PoliteClient, url: str) -> bool:
-    """True when the URL answers with an image (followed redirects, no robots check: it's one asset)."""
+def image_size(data: bytes) -> tuple[int, int] | None:
+    """Width and height from the start of a PNG, GIF, WebP or JPEG file."""
+    if data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) >= 24:
+        return struct.unpack(">II", data[16:24])
+    if data[:6] in (b"GIF87a", b"GIF89a") and len(data) >= 10:
+        return struct.unpack("<HH", data[6:10])
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP" and len(data) >= 30:
+        chunk = data[12:16]
+        if chunk == b"VP8 ":
+            w, h = struct.unpack("<HH", data[26:30])
+            return w & 0x3FFF, h & 0x3FFF
+        if chunk == b"VP8L":
+            b = data[21:25]
+            return 1 + (((b[1] & 0x3F) << 8) | b[0]), 1 + (((b[3] & 0xF) << 10) | (b[2] << 2) | ((b[1] & 0xC0) >> 6))
+        if chunk == b"VP8X":
+            return 1 + int.from_bytes(data[24:27], "little"), 1 + int.from_bytes(data[27:30], "little")
+    if data[:2] == b"\xff\xd8":
+        i = 2
+        while i + 9 <= len(data):
+            if data[i] != 0xFF:
+                i += 1
+                continue
+            marker = data[i + 1]
+            if marker in (0xD8, 0x01, 0xFF) or 0xD0 <= marker <= 0xD7:
+                i += 1 if marker == 0xFF else 2
+                continue
+            if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+                h, w = struct.unpack(">HH", data[i + 5:i + 9])
+                return w, h
+            i += 2 + int.from_bytes(data[i + 2:i + 4], "big")
+    return None
+
+
+def probe(http: PoliteClient, url: str) -> tuple[bool, tuple[int, int] | None]:
+    """Whether the URL answers with an image, and its size when the format tells (SVG doesn't)."""
     if not url.startswith("https://"):
-        return False
+        return False, None
     try:
         with http.client.stream("GET", url, timeout=10) as r:
-            return r.status_code == 200 and r.headers.get("content-type", "").startswith("image/")
+            if r.status_code != 200 or not r.headers.get("content-type", "").startswith("image/"):
+                return False, None
+            data = b""
+            for chunk in r.iter_bytes():
+                data += chunk
+                if len(data) >= 262_144 or image_size(data):
+                    break
+            return True, image_size(data)
     except httpx.HTTPError:
-        return False
+        return False, None
+
+
+def is_banner(http: PoliteClient, url: str) -> bool:
+    ok, size = probe(http, url)
+    return ok and size is not None and size[0] >= 400 and size[0] / max(1, size[1]) >= 1.45
+
+
+def is_icon(http: PoliteClient, url: str) -> bool:
+    """Square-ish and big enough to show; an SVG (no size in its header) counts."""
+    ok, size = probe(http, url)
+    return ok and (size is None or (size[0] >= 64 and 0.7 <= size[0] / max(1, size[1]) <= 1.45))
 
 
 def best_logo(http: PoliteClient, head: _Head) -> str | None:
     """A square-ish logo: the biggest touch icon or large icon, else a structured-data logo."""
     icons = sorted(((s, u) for s, u in head.icons if s >= 96), reverse=True)
     for _, url in icons[:3]:
-        if is_image(http, url):
+        if is_icon(http, url):
             return url
     for url in head.logos[:2]:
-        if is_image(http, url):
+        if is_icon(http, url):
             return url
     return None
 
@@ -231,25 +285,28 @@ def organizer_domains(cur, names: list[str], usage: ai.Usage) -> dict[str, str |
 
 
 def find_artwork(http: PoliteClient, row: dict, org_domain: str | None) -> dict:
+    """A banner and/or an icon for the listing, whichever it's missing."""
     pages = [u for u in [row["source_url"], *(row["alt_urls"] or [])] if u and u.startswith("http")][:3]
-    cover = logo = site_icon = None
+    banner = logo = site_icon = None
     for url in pages:
+        if not (row["want_banner"] or row["want_icon"]):
+            break
         head = read_page(http, url)
         if not head:
             continue
-        if not cover:
-            cover = next((u for u in head.images[:2] if not PLACEHOLDER.search(u) and is_image(http, u)), None)
-        if not site_icon and not _is_aggregator(url):
+        if row["want_banner"] and not banner:
+            banner = next((u for u in head.images[:2] if not PLACEHOLDER.search(u) and is_banner(http, u)), None)
+        if row["want_icon"] and not site_icon and not _is_aggregator(url):
             site_icon = best_logo(http, head)
-        if cover and site_icon:
+        if (banner or not row["want_banner"]) and (site_icon or not row["want_icon"]):
             break
-    if org_domain:
+    if row["want_icon"] and org_domain:
         head = read_page(http, f"https://{org_domain}/")
         if head:
             logo = best_logo(http, head)
-        if not logo and is_image(http, f"https://{org_domain}/apple-touch-icon.png"):
+        if not logo and is_icon(http, f"https://{org_domain}/apple-touch-icon.png"):
             logo = f"https://{org_domain}/apple-touch-icon.png"
-    return {"page_image_url": cover, "logo_url": logo or site_icon}
+    return {"page_image_url": banner, "logo_url": logo or site_icon}
 
 
 def run_artwork(conn, limit: int | None = None) -> dict:
@@ -258,11 +315,16 @@ def run_artwork(conn, limit: int | None = None) -> dict:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT id, title, organizer, source_url, alt_urls FROM hackathons
-            WHERE NOT is_hidden AND status IN ('open', 'upcoming')
-              AND (image_url IS NULL OR image_url ~* 'placeholder|default[-_]?thumbnail')
-              AND page_image_url IS NULL AND logo_url IS NULL
-              AND artwork_attempts < %s
+            SELECT * FROM (
+              SELECT id, title, organizer, source_url, alt_urls, prize_usd, artwork_checked_at,
+                     -- Devpost banners come from the detail step; Unstop pages carry none.
+                     (banner_url IS NULL AND page_image_url IS NULL AND source NOT IN ('devpost', 'unstop')) AS want_banner,
+                     (icon_url IS NULL AND logo_url IS NULL
+                      AND (image_url IS NULL OR image_url ~* 'placeholder|default[-_]?thumbnail')) AS want_icon
+              FROM hackathons
+              WHERE NOT is_hidden AND status IN ('open', 'upcoming') AND artwork_attempts < %s
+            ) c
+            WHERE (want_banner OR want_icon)
               AND (artwork_checked_at IS NULL OR artwork_checked_at < now() - interval '7 days')
             ORDER BY artwork_checked_at NULLS FIRST, prize_usd DESC NULLS LAST
             LIMIT %s
@@ -271,7 +333,7 @@ def run_artwork(conn, limit: int | None = None) -> dict:
         )
         rows = cur.fetchall()
         usage = ai.Usage()
-        domains = organizer_domains(cur, [r["organizer"] for r in rows if r["organizer"]], usage)
+        domains = organizer_domains(cur, [r["organizer"] for r in rows if r["organizer"] and r["want_icon"]], usage)
     conn.commit()
     stats["candidates"] = len(rows)
     if not rows:
@@ -288,7 +350,8 @@ def run_artwork(conn, limit: int | None = None) -> dict:
         for row, res in zip(rows, results):
             found = bool(res["page_image_url"] or res["logo_url"])
             cur.execute(
-                "UPDATE hackathons SET page_image_url = %s, logo_url = %s, artwork_checked_at = now(),"
+                "UPDATE hackathons SET page_image_url = COALESCE(%s, page_image_url), logo_url = COALESCE(%s, logo_url),"
+                " artwork_checked_at = now(),"
                 " artwork_attempts = CASE WHEN %s THEN artwork_attempts ELSE artwork_attempts + 1 END WHERE id = %s",
                 (res["page_image_url"], res["logo_url"], found, row["id"]),
             )

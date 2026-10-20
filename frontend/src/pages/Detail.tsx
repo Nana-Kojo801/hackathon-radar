@@ -8,14 +8,14 @@ import { fromPlatform, Prizes } from "../components/Prizes";
 import { fetchData, type Hackathon, type HackathonDetail } from "../lib/api";
 import { calendarEvents, downloadIcs, googleCalendarUrl } from "../lib/calendar";
 import {
+  bannerOf,
   categoryLabel,
   daysLeft,
   durationDays,
   dayMonth,
   FORMAT_LABEL,
   hostOf,
-  imageOf,
-  logoOf,
+  iconOf,
   prizeShort,
   sourceName,
   timeAgo,
@@ -29,6 +29,13 @@ import { type Stage, track, usePersonal } from "../lib/personal";
 import { logView } from "../lib/stats";
 import { copyText, toast } from "../lib/toast";
 import { cn } from "../lib/utils";
+
+/**
+ * The banner's height: the image's own shape across the screen (share images are
+ * 1.91:1; Devpost's header photos are wider), kept between 1.5:1 and 2.6:1 so
+ * it's never a sliver or a wall, and capped on wide screens.
+ */
+const bannerHeight = (ratio: number) => `min(100vw / ${Math.min(2.6, Math.max(1.5, ratio)).toFixed(3)}, 380px)`;
 
 export function Detail({ id, initial }: { id: string; initial?: Hackathon }) {
   const [detail, setDetail] = useState<HackathonDetail | null>(null);
@@ -80,7 +87,11 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
   const source = sourceName(h);
   const register = `Register on ${source === "the web" ? hostOf(h.source_url) : source}`;
   const days = daysLeft(h);
-  const img = imageOf(h) ?? logoOf(h);
+  const [bannerFailed, setBannerFailed] = useState(false);
+  const banner = bannerFailed ? null : bannerOf(h);
+  const [bannerRatio, setBannerRatio] = useState(1.91);
+  const BANNER_H = bannerHeight(bannerRatio);
+  const icon = iconOf(h)?.src ?? null;
 
   const share = async () => {
     const url = h.source_url;
@@ -104,9 +115,26 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
     <OverlayPage
       title={h.title}
       backdrop={
-        img ? (
+        banner ? (
+          // The banner runs edge to edge under the floating buttons and fades into the page.
+          // Dark underneath: banner art is made for a dark backdrop, and some has transparent parts.
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden bg-[#0e0e12]" style={{ height: `calc(env(safe-area-inset-top) + ${BANNER_H})` }}>
+            {/* A strip much wider than the header (Devpost's are around 7:1) is shown whole, over a
+                blurred stretch of itself, rather than cropped to its middle. */}
+            {bannerRatio > 2.6 && <img src={banner} alt="" className="absolute inset-0 h-full w-full scale-125 object-cover opacity-80 blur-2xl saturate-150" />}
+            <img
+              src={banner}
+              alt=""
+              onLoad={(e) => setBannerRatio(e.currentTarget.naturalWidth / Math.max(1, e.currentTarget.naturalHeight))}
+              onError={() => setBannerFailed(true)}
+              className={cn("absolute inset-0 h-full w-full", bannerRatio > 2.6 ? "object-contain" : "object-cover")}
+            />
+            <div className="absolute inset-x-0 top-0 h-28" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.32), transparent)" }} />
+            <div className="absolute inset-x-0 bottom-0 h-[34%]" style={{ background: "linear-gradient(180deg, transparent, var(--bg))" }} />
+          </div>
+        ) : icon ? (
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[400px] overflow-hidden">
-            <img src={img} alt="" className="absolute -top-24 -left-20 h-[540px] w-[calc(100%+160px)] object-cover opacity-50 blur-[60px] saturate-150 dark:opacity-55" />
+            <img src={icon} alt="" className="absolute -top-24 -left-20 h-[540px] w-[calc(100%+160px)] object-cover opacity-50 blur-[60px] saturate-150 dark:opacity-55" />
             <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, color-mix(in srgb, var(--bg) 0%, transparent) 0%, var(--bg) 100%)" }} />
           </div>
         ) : undefined
@@ -152,17 +180,30 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
       }
     >
       <div className="pb-36">
-        <motion.header initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={spring} className="flex items-start gap-4 px-5 pt-2">
-          <Thumb h={h} size={108} radius={24} className="shadow-[0_10px_24px_-6px_rgba(0,0,0,0.35)]" />
-          <div className="min-w-0 flex-1 pt-0.5">
-            <h1 className="text-title2 font-bold tracking-[-0.022em]">{h.title}</h1>
+        {banner ? (
+          // The icon overlaps the banner's bottom edge, App Store style, with the title below.
+          <motion.header initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={spring} className="relative px-5" style={{ marginTop: `calc(${BANNER_H} - 60px - 46px)` }}>
+            <Thumb h={h} size={92} radius={22} className="shadow-[0_0_0_4px_var(--bg),0_14px_30px_-10px_rgba(0,0,0,0.45)]" />
+            <h1 className="mt-3.5 text-title1 font-bold tracking-[-0.026em]">{h.title}</h1>
             {h.organizer && <p className="mt-1 text-subhead text-label-2">{h.organizer}</p>}
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               <StatusPill h={h} />
               <span className="flex h-6 items-center rounded-full bg-fill px-2.5 text-footnote font-semibold text-label-2">{source === "the web" ? "Web" : source}</span>
             </div>
-          </div>
-        </motion.header>
+          </motion.header>
+        ) : (
+          <motion.header initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={spring} className="flex items-start gap-4 px-5 pt-2">
+            <Thumb h={h} size={108} radius={24} className="shadow-[0_10px_24px_-6px_rgba(0,0,0,0.35)]" />
+            <div className="min-w-0 flex-1 pt-0.5">
+              <h1 className="text-title2 font-bold tracking-[-0.022em]">{h.title}</h1>
+              {h.organizer && <p className="mt-1 text-subhead text-label-2">{h.organizer}</p>}
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                <StatusPill h={h} />
+                <span className="flex h-6 items-center rounded-full bg-fill px-2.5 text-footnote font-semibold text-label-2">{source === "the web" ? "Web" : source}</span>
+              </div>
+            </div>
+          </motion.header>
+        )}
 
         <Facts h={h} detail={detail} />
 

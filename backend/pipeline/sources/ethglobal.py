@@ -126,4 +126,5 @@ class ETHGlobalSource(Source):
             categories=["web3/blockchain"],
             international_ok=True if fmt == "online" else None,
             image_url=image,
+            banner_url=image,
         )

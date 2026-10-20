@@ -95,6 +95,8 @@ class DevpostSource(Source):
             format="online" if online else "in_person",
             categories=map_themes(themes),
             image_url=("https:" + thumb) if thumb.startswith("//") else (thumb or None),
+            # The thumbnail is square; the wide header photo comes from the page (fetch_detail).
+            icon_url=("https:" + thumb) if thumb.startswith("//") else (thumb or None),
         )
 
     def fetch_detail(self, listing: dict) -> dict | None:
@@ -110,7 +112,9 @@ class DevpostSource(Source):
             meta = soup.find("meta", attrs={"name": "description"})
             if meta and meta.get("content"):
                 text = meta["content"].strip()
-        return {"text": text or None, "prizes": parse_prizes(soup)}
+        # The header photo across the top of the page (challenge_photos/.../full_width.png).
+        banner = next((img["src"] for img in soup.select("img[src]") if "challenge_photos" in img["src"]), None)
+        return {"text": text or None, "prizes": parse_prizes(soup), "banner": banner}
 
 
 def paragraphs(el) -> str:

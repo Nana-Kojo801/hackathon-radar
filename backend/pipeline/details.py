@@ -1,4 +1,4 @@
-"""Detail step: fetch listings' own pages for the long description and prize breakdown.
+"""Detail step: fetch listings' own pages for the long description, prize breakdown and banner.
 
 Runs after the sources and before AI enrichment, for listings that are new,
 changed, or last fetched over a week ago. Only sources that implement
@@ -52,11 +52,12 @@ def run_details(conn, sources: dict[str, Source], limit: int = MAX_DETAILS_PER_R
                     UPDATE hackathons SET
                         description_detail = COALESCE(%s, description_detail),
                         prizes = CASE WHEN jsonb_array_length(%s) > 0 THEN %s ELSE prizes END,
+                        banner_url = COALESCE(%s, banner_url),
                         details_fetched_at = now()
                     WHERE id = %s
                     """,
                     (clean_text(detail.get("text"), 8000), Jsonb(detail.get("prizes") or []),
-                     Jsonb(detail.get("prizes") or []), row["id"]),
+                     Jsonb(detail.get("prizes") or []), detail.get("banner"), row["id"]),
                 )
             conn.commit()
             stats["fetched"] += 1
