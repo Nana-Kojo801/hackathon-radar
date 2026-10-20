@@ -23,7 +23,11 @@ PERSONAL_KEY = os.getenv("PERSONAL_KEY", "") or ADMIN_TOKEN
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 NOTIFY_EMAIL = os.getenv("NOTIFY_EMAIL", "")
 NOTIFY_FROM = os.getenv("NOTIFY_FROM", "") or "Hackathon Radar <onboarding@resend.dev>"
-# Where links in emails point.
+# Push notifications (app/push.py). One base64url private key; the public key
+# the browser needs is derived from it. Generate with: python -m app.push --generate-key
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "").strip()
+VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "") or (f"mailto:{NOTIFY_EMAIL}" if NOTIFY_EMAIL else "mailto:hackathon-radar@example.com")
+# Where links in emails and notifications point.
 APP_URL = (os.getenv("APP_URL", "") or "https://hackathon-radar.nkabenyah.workers.dev").rstrip("/")
 MAX_ENRICH_PER_RUN = _int("MAX_ENRICH_PER_RUN", 60)
 MAX_DISCOVERY_PAGES = _int("MAX_DISCOVERY_PAGES", 12)

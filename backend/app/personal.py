@@ -1,5 +1,5 @@
 """Personal tracking API: saved hackathons, stages, notes, "not interested",
-and the email settings.
+and the email and push notification settings.
 
 The app has one user and no accounts. Every route here needs the personal key
 (env PERSONAL_KEY, or ADMIN_TOKEN when that's unset) in the X-Personal-Key
@@ -9,6 +9,7 @@ header; each device stores it once. The public hackathon data stays open.
 import secrets
 from typing import Annotated, Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -35,7 +36,10 @@ HACKATHON_KEYS = (
 SETTINGS_COLUMNS = """
     alerts_enabled, alert_min_prize::float AS alert_min_prize, alert_categories, alert_formats,
     alert_international_only, alert_skip_student_only, reminders_enabled, reminder_days,
-    digest_enabled, last_alert_at, last_digest_at, updated_at
+    digest_enabled, last_alert_at, last_digest_at, updated_at,
+    push_new_matches, push_closing_soon, push_big_prizes, push_digest,
+    big_prize_min::float AS big_prize_min, quiet_hours_enabled, quiet_start, quiet_end, timezone,
+    (SELECT count(*)::int FROM push_subscriptions) AS push_devices
 """
 
 
@@ -48,6 +52,14 @@ def require_key(x_personal_key: Annotated[str | None, Header()] = None) -> None:
 
 
 router = APIRouter(prefix="/me", dependencies=[Depends(require_key)])
+
+
+def _valid_tz(name: str) -> bool:
+    try:
+        ZoneInfo(name)
+        return True
+    except (ZoneInfoNotFoundError, ValueError):
+        return False
 
 
 def _item(row: dict) -> dict:
@@ -123,6 +135,15 @@ class SettingsBody(BaseModel):
     reminders_enabled: bool | None = None
     reminder_days: int | None = Field(default=None, ge=1, le=14)
     digest_enabled: bool | None = None
+    push_new_matches: bool | None = None
+    push_closing_soon: bool | None = None
+    push_big_prizes: bool | None = None
+    push_digest: bool | None = None
+    big_prize_min: float | None = Field(default=None, ge=0, le=100_000_000)
+    quiet_hours_enabled: bool | None = None
+    quiet_start: int | None = Field(default=None, ge=0, le=23)
+    quiet_end: int | None = Field(default=None, ge=0, le=23)
+    timezone: str | None = Field(default=None, max_length=64)
 
 
 @router.put("/settings")
@@ -130,6 +151,8 @@ def update_settings(body: SettingsBody) -> dict:
     changes = body.model_dump(exclude_none=True)
     bad = [c for c in changes.get("alert_categories", []) if c not in CATEGORIES]
     bad += [f for f in changes.get("alert_formats", []) if f not in FORMATS]
+    if "timezone" in changes and not _valid_tz(changes["timezone"]):
+        bad.append(changes["timezone"])
     if bad:
         raise HTTPException(422, f"unknown values: {', '.join(bad)}")
     with db.cursor() as cur:
