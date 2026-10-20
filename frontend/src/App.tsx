@@ -183,8 +183,10 @@ export default function App() {
     const outScroll = scrolls.current[from] ?? 0;
     const inScroll = scrolls.current[route.tab] ?? 0;
     if (outEl) {
-      // Pinned where it was, out of the flow, so the incoming tab can restore its own scroll.
-      Object.assign(outEl.style, { position: "fixed", top: `${-outScroll}px`, left: "0", right: "0", pointerEvents: "none" });
+      // Taken out of the flow and placed so it stays where it was on screen once the window
+      // scrolls to the incoming tab's position. Absolute, not fixed: iPhone Safari composites fixed
+      // elements together, and a moving fixed tab dragged the (fixed) tab bar along with it.
+      Object.assign(outEl.style, { position: "absolute", top: `${inScroll - outScroll}px`, left: "0", right: "0", pointerEvents: "none" });
       outEl.style.setProperty("--tab-scroll", `${outScroll}px`);
     }
     window.scrollTo(0, inScroll);
@@ -205,8 +207,8 @@ export default function App() {
       setTabs((t) => (t.leaving === from ? { ...t, leaving: null } : t));
     };
     endSlide.current = reset;
-    slide(outEl, "x", startX, -dir * w, "page");
-    slide(inEl, "x", dir * w + startX, 0, "page", () => reset());
+    slide(outEl, "x", startX, -dir * w, "tab");
+    slide(inEl, "x", dir * w + startX, 0, "tab", () => reset());
   }, [route.tab, tabs.leaving]);
 
   const onReselect = useCallback((t: Tab) => {
@@ -251,7 +253,7 @@ export default function App() {
   return (
     <DataContext.Provider value={data}>
       <MotionConfig reducedMotion="user">
-        <div ref={under} className="min-h-dvh">
+        <div ref={under} className="relative min-h-dvh">
           {TAB_ORDER.filter((t) => visited.has(t)).map((t) => (
             <main
               key={t}
