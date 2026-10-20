@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 
 import { HackRow } from "../components/HackRow";
@@ -131,8 +131,8 @@ export function Saved() {
         }))}
       />
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={segment} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ ...spring, opacity: { duration: 0.15 } }}>
+      {/* Keyed, so a new segment slides in (.swap-in in index.css). */}
+      <div key={segment} className="swap-in">
           {segment === "active" &&
             (counts.active === 0 ? (
               <EmptyState
@@ -185,8 +185,7 @@ export function Saved() {
             ) : (
               <EmptyState icon="eyeOff" title="Nothing hidden" text="Hackathons you mark Not interested disappear from your lists and wait here." />
             ))}
-        </motion.div>
-      </AnimatePresence>
+      </div>
     </div>
   );
 }

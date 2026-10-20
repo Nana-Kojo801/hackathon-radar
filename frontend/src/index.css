@@ -421,18 +421,22 @@
   }
 }
 
-/* Switching prize groups: the new list slides in; the old one just goes. */
-@keyframes prize-in {
+/*
+ * Switching segments and tabs inside a page (Saved, Stats, prize groups): the
+ * new content slides in; the old one just goes. Animating the old one out as
+ * well (framer's exit, lifting it out of the layout) flickered in Safari.
+ */
+@keyframes swap-in {
   from {
     opacity: 0;
     transform: translateX(12px);
   }
 }
-.prize-list {
-  animation: prize-in 0.32s var(--ease-sheet);
+.swap-in {
+  animation: swap-in 0.32s var(--ease-sheet);
 }
 @media (prefers-reduced-motion: reduce) {
-  .prize-list {
+  .swap-in {
     animation: none;
   }
 }

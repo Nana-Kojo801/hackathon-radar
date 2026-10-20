@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { type ReactNode, useState } from "react";
 
 import { CalendarHeat, Columns, compact, HBars, HeatGrid, Legend, PairBars, Ring, StackBar } from "../components/charts";
@@ -6,7 +6,7 @@ import { Icon, type IconName } from "../components/Icon";
 import { PrimaryButton, Segmented } from "../components/kit";
 import { OverlayPage } from "../components/OverlayPage";
 import { categoryLabel, compactMoney, dayMonth, FORMAT_LABEL, SOURCE_NAME } from "../lib/format";
-import { rise, spring } from "../lib/motion";
+import { rise } from "../lib/motion";
 import { usePersonal } from "../lib/personal";
 import { linkTo, navigate } from "../lib/router";
 import { type MarketStats, type MyStats, type OpenSource, useMarketStats, useMyStats } from "../lib/stats";
@@ -37,8 +37,8 @@ export function StatsPage() {
           ]}
           className="mx-4 mt-4"
         />
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={view} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={spring}>
+        {/* Keyed, so the other view slides in (.swap-in in index.css). */}
+        <div key={view} className="swap-in">
             {view === "you" ? (
               !p.key ? (
                 <ConnectPrompt />
@@ -52,8 +52,7 @@ export function StatsPage() {
             ) : (
               <Loading error={market.error} />
             )}
-          </motion.div>
-        </AnimatePresence>
+        </div>
       </div>
     </OverlayPage>
   );

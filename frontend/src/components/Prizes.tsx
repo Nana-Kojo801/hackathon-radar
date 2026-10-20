@@ -162,9 +162,8 @@ export function Prizes({ h, items }: { h: Hackathon; items: PrizeItem[] }) {
         )}
 
         <div className="mt-2">
-          {/* A new group just slides in (CSS, index.css .prize-list). No exit animation: the old list
-              being lifted out of the layout while it faded made Safari flicker at the end. */}
-          <ul key={group.key} className="prize-list">
+          {/* Keyed, so a new group slides in (.swap-in in index.css). */}
+          <ul key={group.key} className="swap-in">
             {rows.map((p, i) => (
               <PrizeRow key={`${p.name}-${p.rank}-${i}`} p={p} lead={i === 0 && p.rank === 1} first={i === 0} />
             ))}
