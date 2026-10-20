@@ -7,8 +7,11 @@
  * - /assets/*: cache first. Their file names change with every build.
  * - The data snapshot on GitHub Pages: network first, cached copy when offline.
  * - Everything else (the API, personal data) goes straight to the network.
+ *
+ * It also shows push notifications sent by the server (backend/app/push.py)
+ * and opens the right page when one is tapped.
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
 const DATA = `data-${VERSION}`;
@@ -65,4 +68,43 @@ self.addEventListener("fetch", (event) => {
   } else if (url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com") {
     event.respondWith(cacheFirst(request, ASSETS));
   }
+});
+
+// ---------------------------------------------------------------- push
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: "Hackathon Radar", body: event.data ? event.data.text() : "" };
+  }
+  const title = data.title || "Hackathon Radar";
+  const options = {
+    body: data.body || "",
+    tag: data.tag || "radar",
+    renotify: true,
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    data: { url: data.url || "/" },
+  };
+  const badge =
+    typeof data.badge === "number" && "setAppBadge" in self.navigator
+      ? (data.badge > 0 ? self.navigator.setAppBadge(data.badge) : self.navigator.clearAppBadge()).catch(() => undefined)
+      : Promise.resolve();
+  event.waitUntil(Promise.all([self.registration.showNotification(title, options), badge]));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      const open = windows.find((w) => new URL(w.url).origin === self.location.origin);
+      if (open) {
+        return open.focus().then((w) => (w && "navigate" in w ? w.navigate(url) : undefined));
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
 });

@@ -47,6 +47,17 @@ export interface Settings {
   digest_enabled: boolean;
   last_alert_at: string | null;
   last_digest_at: string | null;
+  push_new_matches: boolean;
+  push_closing_soon: boolean;
+  push_big_prizes: boolean;
+  push_digest: boolean;
+  big_prize_min: number;
+  quiet_hours_enabled: boolean;
+  quiet_start: number;
+  quiet_end: number;
+  timezone: string;
+  /** Devices with push turned on (read-only). */
+  push_devices: number;
 }
 
 interface State {
@@ -124,7 +135,7 @@ export function personalState(): State {
 class KeyError extends Error {}
 
 /** One API call with the key; retries network errors and 5xx while the API wakes up. */
-async function call<T>(path: string, init: { method?: string; body?: unknown } = {}, key = state.key): Promise<T> {
+export async function call<T>(path: string, init: { method?: string; body?: unknown } = {}, key = state.key): Promise<T> {
   if (!key) throw new KeyError("no key");
   let last: unknown;
   for (let attempt = 0; attempt < 5; attempt++) {

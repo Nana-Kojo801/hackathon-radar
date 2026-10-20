@@ -26,7 +26,7 @@ backend/
     enrich.py     the structured OpenAI call and its cost guards
     run.py        entry point
   tests/
-frontend/         React + Vite + TypeScript + Tailwind + Framer Motion + shadcn-style Radix components
+frontend/         React + Vite + TypeScript + Tailwind + Framer Motion + Radix primitives
 .github/workflows/refresh.yml   the 6-hourly cron
 render.yaml       Render blueprint for the API
 DECISIONS.md      choices that differ from (or fill gaps in) the spec
@@ -43,6 +43,8 @@ DECISIONS.md      choices that differ from (or fill gaps in) the spec
 | `ADMIN_TOKEN` | Render | protects `POST /admin/refresh` |
 | `PERSONAL_KEY` | Render | unlocks your personal data (saved hackathons, notes, email settings); each device enters it once in Settings. Falls back to `ADMIN_TOKEN` if unset |
 | `RESEND_API_KEY` | GitHub secret | [Resend](https://resend.com) API key, for the email alerts |
+| `VAPID_PRIVATE_KEY` | Render and GitHub secret | turns on push notifications; make one with `python -m app.push --generate-key` (see [Push notifications](#push-notifications)) |
+| `VAPID_SUBJECT` | optional | contact for the push services, default `mailto:` + `NOTIFY_EMAIL` |
 | `NOTIFY_EMAIL` | GitHub secret | where the emails go |
 | `NOTIFY_FROM` | optional GitHub variable | default `Hackathon Radar <onboarding@resend.dev>`, which can only send to your Resend account's own address |
 | `APP_URL` | optional GitHub variable | where links in emails point; default the workers.dev URL |
@@ -109,9 +111,10 @@ TEST_DATABASE_URL=postgresql://postgres:pg@localhost:5432/radar_test python -m p
    Then add the resulting site URL (`https://<project>.pages.dev` or `https://<project>.<you>.workers.dev`) to `ALLOWED_ORIGINS` on Render.
 4. **GitHub Actions (cron):** go to repo Settings → Secrets and variables → Actions and add the secrets `DATABASE_URL`, `OPENAI_API_KEY` and `SEARCH_API_KEY`. You can optionally add the variables `OPENAI_MODEL`, `MAX_ENRICH_PER_RUN` and `MAX_DISCOVERY_PAGES`. The workflow runs every 6 hours.
 5. **Personal key:** on Render, add `PERSONAL_KEY` to the API's environment: any long random string (a password manager can make one). Then open the app's **Settings** on each device and paste it once.
-6. **Emails (optional):** create a free [Resend](https://resend.com) account, make an API key, and add the GitHub secrets `RESEND_API_KEY` and `NOTIFY_EMAIL` (the address you signed up to Resend with, when using the default sender). Check it with Actions → *Send test email* → *Run workflow*.
-7. **GitHub Pages (fast loading):** go to repo Settings → Pages → Build and deployment and set **Source** to **GitHub Actions**. After each refresh, the *Publish data snapshot* workflow puts a static copy of the data there (see [Fast loading](#fast-loading)). If you skip this, the site still works but waits for the API to wake up.
-8. **First fill:** trigger a manual refresh (see below). The first run stores every listing right away but only enriches 60 of them, so it takes about 4 runs (one day of cron, or a few manual runs) before every listing has an AI summary. Listings that aren't enriched yet still show up with their platform data: prize, dates, format and categories.
+6. **Push notifications (optional):** run `python -m app.push --generate-key` once and add the printed `VAPID_PRIVATE_KEY` both on Render (Environment) and as a GitHub secret. Then turn notifications on in the app (see [Push notifications](#push-notifications)).
+7. **Emails (optional):** create a free [Resend](https://resend.com) account, make an API key, and add the GitHub secrets `RESEND_API_KEY` and `NOTIFY_EMAIL` (the address you signed up to Resend with, when using the default sender). Check it with Actions → *Send test email* → *Run workflow*.
+8. **GitHub Pages (fast loading):** go to repo Settings → Pages → Build and deployment and set **Source** to **GitHub Actions**. After each refresh, the *Publish data snapshot* workflow puts a static copy of the data there (see [Fast loading](#fast-loading)). If you skip this, the site still works but waits for the API to wake up.
+9. **First fill:** trigger a manual refresh (see below). The first run stores every listing right away but only enriches 60 of them, so it takes about 4 runs (one day of cron, or a few manual runs) before every listing has an AI summary. Listings that aren't enriched yet still show up with their platform data: prize, dates, format and categories.
 
 Note: GitHub pauses scheduled workflows in repos with no activity for 60 days. If that happens, re-enable the workflow from the Actions tab.
 
@@ -128,37 +131,57 @@ A Postgres advisory lock stops two refreshes from running at once.
 
 ## Frontend
 
-The UI follows the "Atlantic" design: a light theme with two pages.
+An iPhone-style app, built phone first: large titles, grouped cards, a floating glass tab bar, swipe actions and sheets. On a laptop the same screens sit in a centred column.
 
-- **Explore hackathons (`/`):** search, filters (format, international, student-only, one or more categories, minimum prize), sort (prize, deadline, newest, relevance), a cards/table switch, and pages of 10. On a phone the filters open in a bottom sheet. Cards show a countdown to the registration deadline for the coming month ("Closes in 12 days") and a **NEW** badge on hackathons first seen in the last 48 hours.
-- **Hackathon details (`/h/<id>`):** the key facts strip, tabs that follow your scroll (Overview, Eligibility, Key dates, Prize details, Source), the prize breakdown, a Register button, **Add to calendar** (Google Calendar links, or an .ics file for Apple Calendar and Outlook with a reminder a day before the deadline) and **Share** (the phone's share sheet, or copies the link on a computer). Register sits in a sidebar on desktop and is pinned to the bottom on a phone.
+- **Today (`/`):** what needs you. Counts for closing this week / new since your last visit / open, countdown cards for the hackathons you saved, the biggest prize closing this week, the rest of this week's deadlines and the new arrivals. Each count opens Explore with that filter.
+- **Explore (`/explore`):** search, removable filter chips with quick suggestions, a sort menu, and a filter sheet (sort, closes within, format, minimum prize, worldwide, student-only, new only, categories, platforms). The list loads more as you scroll. Swipe a row left for **Save** and **Hide**.
+- **A hackathon (`/h/<id>`):** slides in over the tab you came from. Cover art, the key facts (prize, closes in, format, who can enter), your progress (Interested → Registered → Submitted → Won/Didn't place) and a note, **Brainstorm ideas with Claude**, the description, prizes, share, calendar (Google Calendar or an .ics with a reminder) and a floating **Register** button. Swipe from the left edge to go back.
+- **Saved (`/saved`):** your hackathons by stage: what closes this week (with your notes), later ones, submitted, results and hidden.
+- **Settings (`/settings`):** connect the device, notifications, email alerts, reminders, the digest, appearance and which tab the app opens on.
+
+**Appearance** (Settings › Appearance, saved per device): Automatic/Light/Dark theme, six accent colours, **Liquid Glass** (clear, light-bending glass on the tab bar, buttons and menus; off gives a calmer frosted look), five text sizes, compact or comfortable lists, and three home-screen icons (iPhone picks up a new icon when the app is removed from the Home Screen and added again).
+
+**Motion:** everything moves on springs (`frontend/src/lib/motion.ts`) tuned to be quick with a small, firm bounce: pages push in like iOS navigation, sheets and menus spring out of their buttons, the tab bar's selection pill and toggles bounce, rows follow your finger. The device's Reduce Motion setting turns animations off.
 
 How it behaves:
 
 - **Links:** every hackathon has its own link, `/h/<id>`, which you can share. The Cloudflare Worker serves the app for these paths.
 - **Link previews:** when one of this app's own links is pasted into WhatsApp, Messages, Slack and so on, the card shows the hackathon's name, prize, deadline, location and summary, with the Hackathon Radar image (`public/og-image.png`). A small Worker script (`frontend/worker/index.ts`, configured in `frontend/wrangler.jsonc`) runs only for `/` and `/h/<id>`: it reads the hackathon from the GitHub Pages snapshot and adds the preview tags to the page. Everything else is served straight from the static files. If you rename the Worker in Cloudflare, change `name` in `wrangler.jsonc` to match.
-- **Going back** returns you to the same place in the list, with your filters kept.
+- **Going back** returns you to the same place in the list; each tab keeps its own scroll position, and your filters are kept.
 - **Speed:** filtering, sorting and search all happen in the browser, so they respond instantly.
-- **Accessibility:** animations follow the device's "reduce motion" setting.
 
 ## Personal features
 
 The app is for one person, so there are no accounts. Your personal data lives in Neon behind the personal key (`PERSONAL_KEY`), which each device enters once in **Settings**. Your phone and laptop share it.
 
 - **Install it:** on a phone, open the site and use *Add to Home Screen* (iPhone: Share → Add to Home Screen; Android/Chrome: menu → Install app). On a laptop, Chrome or Edge shows an install icon in the address bar. It opens without browser bars and works offline with the data it last loaded.
-- **Track hackathons:** on a hackathon's page, **Save** it, then set its stage (Interested, Registered, Submitted, Won, Didn't place) and keep **notes**. **Not interested** hides it from the list. **My hackathons** (the bookmark in the top bar) groups them by stage. Changes show at once and sync in the background, since the free API can take a minute to wake.
-- **Ask Claude for ideas:** **Copy prompt** copies a brief with everything known about the hackathon (dates, prizes, themes, rules, the organizer's description) asking Claude for project ideas tailored to you. **Open in Claude** also opens Claude with it filled in. That uses claude.ai's `?q=` parameter, which isn't documented, so the prompt is copied too in case it doesn't fill in.
+- **Track hackathons:** swipe a row left and tap **Save**, or use the bookmark on a hackathon's page; set its stage and keep a note there. **Hide** (or **Not interested**) takes it out of every list; it waits under Saved › Hidden. Saving works before the device is connected too: it's kept on the device and syncs once you connect. Changes show at once and sync in the background, since the free API can take a minute to wake.
+- **Ask Claude for ideas:** **Brainstorm ideas with Claude** opens Claude with a brief that has everything known about the hackathon (dates, prizes, themes, rules, the organizer's description), or copies it. Claude's `?q=` prefill isn't documented, so the prompt is copied either way.
 - **Share** sends the hackathon's own page (Devpost, Devfolio, ...), not this app's link.
+- **Badge:** the installed app's icon shows how many saved hackathons close this week (Settings › Notifications › Badge on app icon).
+
+## Push notifications
+
+Notifications reach the phone like any app's, so you hear about a match even when you skip the email. They're sent by the same step as the emails, after every refresh:
+
+- **New matches:** hackathons that fit your alert rules (Settings › Email alerts).
+- **Big new prizes:** anything over a threshold you pick (default $100K), whatever the rules.
+- **Closing soon:** saved hackathons, a set number of days before registration closes.
+- **Weekly summary:** optional, Monday mornings.
+
+Quiet hours hold notifications until the first check after they end, in the phone's timezone. Tapping a notification opens the hackathon (or Explore filtered to the new ones).
+
+Set up once: `cd backend && python -m app.push --generate-key`, then add the printed `VAPID_PRIVATE_KEY` on Render and as a GitHub secret. On the phone: add the app to the Home Screen (iPhone needs this, iOS 16.4 or later), open it from there, connect the device, then Settings › Notifications › Allow notifications. **Send a test notification** checks the whole path.
 
 ## Emails
 
-`python -m app.notify` runs after every refresh (the last step of the *Refresh hackathons* workflow) and sends, via Resend, whatever you've switched on in **Settings**:
+`python -m app.notify` runs after every refresh (the last step of the *Refresh hackathons* workflow) and sends, via Resend, whatever you've switched on in **Settings** (it also sends the push notifications):
 
 - **New hackathon alerts:** hackathons that appeared since the last check and match your rules (minimum prize, categories, formats, international only, skip student-only). One email per refresh, only when something matches. The very first run just records a starting point.
 - **Closing soon:** for hackathons marked Interested or Registered, once, a set number of days before registration closes.
 - **Weekly digest:** Monday mornings (UTC): the week's best matches and your deadlines for the next 7 days.
 
-`python -m app.notify --dry-run` prints what would be sent without sending or recording anything. Without `RESEND_API_KEY` and `NOTIFY_EMAIL` the step skips with a warning.
+`python -m app.notify --dry-run` prints what would be sent (emails and pushes) without sending or recording anything. Without `RESEND_API_KEY` and `NOTIFY_EMAIL` the emails are skipped with a warning; without `VAPID_PRIVATE_KEY` the pushes are.
 
 ## Fast loading
 
@@ -173,6 +196,8 @@ The free Render API sleeps after 15 minutes idle and takes 30-60 seconds to wake
 - `GET /hackathons`: takes `sort` (`prize` default, `deadline`, `new`, `relevance`), `category` (repeatable), `format`, `min_prize`, `international_ok`, `student_only`, `status` (default `open,upcoming`), `q`, `limit`, `offset`. Returns `{items, total, limit, offset}`.
 - `GET /hackathons/{id}`: everything in the list plus `description` (the long text) and `prizes` (the breakdown, with each prize's amount per winner and the winner count).
 - `GET /meta`: category counts, last refresh time, and the latest run per source with fetched/new/errors/tokens.
+- `GET /push/key`: the public key for push subscriptions (null when push isn't set up).
+- `/me/...` (needs `X-Personal-Key`): `GET /me`, `PUT /me/hackathons/{id}`, `PUT /me/settings`, `POST`/`DELETE /me/push` (this device's push subscription) and `POST /me/push/test`.
 - `POST /admin/refresh`: needs the `X-Admin-Token` header.
 - `GET /health`
 

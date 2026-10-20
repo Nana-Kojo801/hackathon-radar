@@ -1,114 +1,255 @@
 @import "tailwindcss";
 
-/* "Atlantic" design tokens, sampled from the design comps. */
-@theme {
-  --font-sans: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+/*
+ * Design tokens. Colours follow iOS system colours; the accent, text size and
+ * glass style are set per device in Appearance (lib/appearance.ts writes the
+ * data attributes and the --accent / --ts variables on <html>).
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
   --breakpoint-wide: 900px;
 
-  --color-canvas: #f1f9fc; /* page behind the white panel */
-  --color-ink: #0a1033; /* titles, prize */
-  --color-ink-2: #08153c; /* strong body */
-  --color-slate: #5a6390; /* labels */
-  --color-body: #6b7096; /* paragraphs */
-  --color-lead: #4c4e78; /* lead paragraph */
-  --color-periwinkle: #4a68c2; /* list organizer, summary, meta */
-  --color-teal: #017c91; /* primary */
-  --color-teal-600: #016a7c;
-  --color-teal-text: #0d869d; /* organizer link on details */
-  --color-sky: #0a9bd5; /* cards toggle, next */
-  --color-line: #e6ebf2;
-  --color-field: #f5f8fb;
-  --color-field-line: #e1e8f1;
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-card-2: var(--card-2);
+  --color-label: var(--label);
+  --color-label-2: var(--label-2);
+  --color-label-3: var(--label-3);
+  --color-sep: var(--sep);
+  --color-fill: var(--fill);
+  --color-track: var(--track);
+  --color-accent: var(--accent);
+  --color-tint: var(--tint);
+  --color-ink: var(--ink);
+  --color-soft: var(--soft);
+  --color-red: var(--red);
+  --color-red-soft: var(--red-soft);
+  --color-red-fill: var(--red-fill);
+  --color-orange: var(--orange);
+  --color-orange-soft: var(--orange-soft);
+  --color-orange-fill: var(--orange-fill);
+  --color-green: var(--green);
+  --color-green-soft: var(--green-soft);
+  --color-neutral-soft: var(--neutral-soft);
 
-  --color-pill-blue-bg: #e5f1fd;
-  --color-pill-blue: #1d5ed8;
-  --color-pill-sky-bg: #e9f5fb;
-  --color-pill-sky: #1890cf;
-  --color-pill-green-bg: #e3f6ec;
-  --color-pill-green: #188a3a;
-  --color-pill-red-bg: #feeadf;
-  --color-pill-red: #e23a1e;
-  --color-pill-grey-bg: #eef1f6;
-  --color-pill-grey: #5a6390;
-  --color-orange: #f97316;
-  --color-chip: #ddecfc;
+  /* iOS text styles, scaled by the Text size setting. */
+  --text-large: calc(34px * var(--ts));
+  --text-large--line-height: 1.2;
+  --text-title2: calc(22px * var(--ts));
+  --text-title2--line-height: 1.27;
+  --text-title3: calc(20px * var(--ts));
+  --text-title3--line-height: 1.25;
+  --text-body: calc(17px * var(--ts));
+  --text-body--line-height: 1.3;
+  --text-callout: calc(16px * var(--ts));
+  --text-callout--line-height: 1.32;
+  --text-subhead: calc(15px * var(--ts));
+  --text-subhead--line-height: 1.33;
+  --text-footnote: calc(13px * var(--ts));
+  --text-footnote--line-height: 1.38;
+  --text-caption: calc(12px * var(--ts));
+  --text-caption--line-height: 1.33;
+  --text-caption2: calc(11px * var(--ts));
+  --text-caption2--line-height: 1.2;
 }
+
+:root {
+  --ts: 1;
+  --bg: #f2f2f7;
+  --card: #ffffff;
+  --card-2: #f4f4f7;
+  --label: #000000;
+  --label-2: #6c6c70;
+  --label-3: #c4c4c7;
+  --sep: rgba(60, 60, 67, 0.16);
+  --fill: rgba(118, 118, 128, 0.12);
+  --track: #e9e9ee;
+  --thumb-line: rgba(0, 0, 0, 0.07);
+  --card-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.03), 0 6px 20px -4px rgba(16, 24, 40, 0.07);
+  --red: #d70015;
+  --red-soft: rgba(215, 0, 21, 0.08);
+  --red-fill: #ff3b30;
+  --orange: #c24e00;
+  --orange-soft: rgba(194, 78, 0, 0.08);
+  --orange-fill: #ff9500;
+  --green: #1b7a34;
+  --green-soft: rgba(27, 122, 52, 0.1);
+  --neutral-soft: rgba(108, 108, 112, 0.09);
+  --seg-on: #ffffff;
+  --scrim: rgba(0, 0, 0, 0.32);
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #000000;
+  --card: #1c1c1e;
+  --card-2: #2c2c2e;
+  --label: #ffffff;
+  --label-2: #aeaeb2;
+  --label-3: #545458;
+  --sep: rgba(84, 84, 88, 0.65);
+  --fill: rgba(118, 118, 128, 0.24);
+  --track: #38383a;
+  --thumb-line: rgba(255, 255, 255, 0.1);
+  --card-shadow: none;
+  --red: #ff6961;
+  --red-soft: rgba(255, 105, 97, 0.18);
+  --red-fill: #ff453a;
+  --orange: #ffb340;
+  --orange-soft: rgba(255, 179, 64, 0.16);
+  --orange-fill: #ff9f0a;
+  --green: #4cd964;
+  --green-soft: rgba(76, 217, 100, 0.18);
+  --neutral-soft: rgba(174, 174, 178, 0.16);
+  --seg-on: #636366;
+  --scrim: rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------- glass */
+
+/* Frosted: the calm, mostly opaque material (Liquid Glass off). */
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.86);
+  --glass-filter: blur(24px) saturate(180%);
+  --glass-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px -6px rgba(16, 24, 40, 0.18);
+  --glass-rim: transparent;
+}
+[data-theme="dark"] {
+  --glass-bg: rgba(30, 30, 32, 0.86);
+  --glass-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* Liquid Glass: clear, bright-edged and lensing what's behind it. */
+[data-glass="liquid"] {
+  --glass-bg: rgba(255, 255, 255, 0.38);
+  --glass-filter: blur(10px) saturate(200%) brightness(1.06);
+  --glass-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.9), inset 0 -1px 1px rgba(255, 255, 255, 0.35),
+    0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 10px 30px -8px rgba(16, 24, 40, 0.28);
+  --glass-rim: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.1) 32%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, 0.12) 68%, rgba(255, 255, 255, 0.7));
+}
+[data-theme="dark"][data-glass="liquid"] {
+  --glass-bg: rgba(44, 44, 48, 0.36);
+  --glass-filter: blur(10px) saturate(190%) brightness(1.1);
+  --glass-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.22), inset 0 -1px 1px rgba(255, 255, 255, 0.06),
+    0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 12px 32px rgba(0, 0, 0, 0.55);
+  --glass-rim: linear-gradient(135deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.05) 32%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, 0.05) 68%, rgba(255, 255, 255, 0.3));
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  [data-glass="liquid"] {
+    --glass-bg: var(--card);
+    --glass-filter: none;
+    --glass-rim: transparent;
+  }
+}
+
+/* ---------------------------------------------------------------- base */
 
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    background: var(--bg);
   }
   body {
     margin: 0;
-    background: var(--color-canvas);
-    color: var(--color-ink);
+    min-height: 100dvh;
+    background: var(--bg);
+    color: var(--label);
     font-family: var(--font-sans);
+    letter-spacing: -0.012em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior-y: none;
   }
   ::selection {
-    background: #bfe9f0;
+    background: color-mix(in srgb, var(--accent) 25%, transparent);
   }
   button,
   [role="button"],
-  [role="option"] {
+  [role="option"],
+  [role="tab"],
+  [role="switch"],
+  [role="radio"] {
     cursor: pointer;
+  }
+  input[type="search"]::-webkit-search-cancel-button {
+    display: none;
+  }
+  :focus-visible {
+    outline: 2px solid var(--tint);
+    outline-offset: 2px;
   }
 }
 
-/* Radix popovers animate from their data-state, shadcn style. */
-@keyframes pop-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.98);
+@layer components {
+  .glass {
+    position: relative;
+    isolation: isolate;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+    box-shadow: var(--glass-shadow);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+  .glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1px;
+    background: var(--glass-rim);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  /* A soft sheen across the top of liquid glass, like light on a lens. */
+  [data-glass="liquid"] .glass::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: radial-gradient(120% 70% at 30% -10%, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 60%);
+    pointer-events: none;
+  }
+  [data-theme="dark"][data-glass="liquid"] .glass::after {
+    background: radial-gradient(120% 70% at 30% -10%, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 60%);
+  }
+  .card {
+    background: var(--card);
+    box-shadow: var(--card-shadow);
+  }
+  .thumb-line {
+    box-shadow: 0 0 0 0.5px var(--thumb-line);
+  }
+  .hairline {
+    border-color: var(--sep);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .snap-row {
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .snap-row > * {
+    scroll-snap-align: start;
   }
 }
-@keyframes pop-out {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-}
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-@keyframes fade-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-@keyframes sheet-up {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-@keyframes sheet-down {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(100%);
-  }
-}
+
 @keyframes shimmer {
   0% {
     background-position: -400px 0;
@@ -117,100 +258,22 @@
     background-position: 400px 0;
   }
 }
+.skeleton {
+  background: linear-gradient(90deg, var(--fill) 0, color-mix(in srgb, var(--fill) 40%, transparent) 40px, var(--fill) 80px);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
-
-.anim-pop[data-state="open"] {
-  animation: pop-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.anim-pop[data-state="closed"] {
-  animation: pop-out 0.1s ease-in;
-}
-.anim-fade[data-state="open"] {
-  animation: fade-in 0.2s ease-out;
-}
-.anim-fade[data-state="closed"] {
-  animation: fade-out 0.15s ease-in;
-}
-.anim-sheet[data-state="open"] {
-  animation: sheet-up 0.32s cubic-bezier(0.32, 0.72, 0, 1);
-}
-.anim-sheet[data-state="closed"] {
-  animation: sheet-down 0.22s ease-in;
-}
-.skeleton {
-  background: linear-gradient(90deg, #eef2f7 0, #f7f9fc 40px, #eef2f7 80px);
-  background-size: 800px 100%;
-  animation: shimmer 1.4s linear infinite;
-}
 .spin {
   animation: spin 0.9s linear infinite;
 }
-
 @media (prefers-reduced-motion: reduce) {
-  .anim-pop,
-  .anim-fade,
-  .anim-sheet,
   .skeleton,
   .spin {
     animation: none !important;
-  }
-}
-
-/* The row you came back from glows briefly so your eye lands on it. */
-@keyframes row-flash {
-  from {
-    background-color: #e3f3f7;
-  }
-  to {
-    background-color: transparent;
-  }
-}
-.row-flash {
-  animation: row-flash 1.5s cubic-bezier(0.4, 0, 0.2, 1) 0.25s backwards;
-}
-@media (prefers-reduced-motion: reduce) {
-  .row-flash {
-    animation: none;
-  }
-}
-
-/* Page transitions (App.tsx). Fill modes are chosen so a page that misses its
-   animation still ends up fully visible. The detail page fades without moving:
-   a transform would detach its pinned Register button while it runs. */
-@keyframes page-enter {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-}
-@keyframes page-enter-fade {
-  from {
-    opacity: 0;
-  }
-}
-@keyframes page-leave {
-  to {
-    opacity: 0;
-  }
-}
-.page-enter {
-  animation: page-enter 0.34s cubic-bezier(0.16, 1, 0.3, 1) backwards;
-}
-.page-enter-fade {
-  animation: page-enter-fade 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
-}
-.page-leave {
-  animation: page-leave 0.17s ease-in forwards;
-  pointer-events: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .page-enter,
-  .page-enter-fade,
-  .page-leave {
-    animation: none;
   }
 }

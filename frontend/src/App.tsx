@@ -1,15 +1,27 @@
-import { MotionConfig, useReducedMotion } from "framer-motion";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, MotionConfig, type MotionValue, motion, useMotionValue, useTransform, type ValueAnimationTransition } from "framer-motion";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { ToastView } from "./components/kit";
+import { TabBar } from "./components/TabBar";
 import { fetchData, fetchJSON, type Hackathon, type Meta } from "./lib/api";
+import { appearance, useAppearance } from "./lib/appearance";
+import { DEFAULT_FILTERS, type Filters, lastVisit, loadFilters, saveFilters } from "./lib/filters";
+import { daysLeft } from "./lib/format";
+import { dragHandle } from "./lib/gesture";
 import { healthWarning } from "./lib/health";
-import { applyFilters, type Filters, loadFilters, saveFilters } from "./lib/filters";
+import { pageSpring } from "./lib/motion";
 import { sync, usePersonal } from "./lib/personal";
-import { navigate, type PageKey, pageKey, usePath } from "./lib/router";
-import { Details } from "./pages/Details";
-import { Discovery } from "./pages/Discovery";
-import { MyHackathons } from "./pages/MyHackathons";
-import { SettingsPage } from "./pages/SettingsPage";
+import { setBadge } from "./lib/push";
+import { goBack, parse, TAB_PATH, type Tab, usePath } from "./lib/router";
+import { type AppData, DataContext } from "./lib/store";
+import { AppearancePage } from "./pages/Appearance";
+import { Detail } from "./pages/Detail";
+import { EmailAlertsPage } from "./pages/EmailAlerts";
+import { Explore } from "./pages/Explore";
+import { NotificationsPage } from "./pages/Notifications";
+import { Saved } from "./pages/Saved";
+import { SettingsTab } from "./pages/Settings";
+import { Today } from "./pages/Today";
 
 interface ListResponse {
   items: Hackathon[];
@@ -19,31 +31,34 @@ interface ListResponse {
 /** Refreshes run every 6 hours; two missed runs means the snapshot stopped updating. */
 const SNAPSHOT_STALE_AFTER = 13 * 3_600_000;
 
-/** Matches .page-leave in index.css. */
-const LEAVE_MS = 170;
-
-// The app restores the list's scroll itself; the browser's own restoration on
-// Back would jump the page before the transition runs.
+// The app restores each tab's scroll itself.
 if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+
+// Open on the tab chosen in Settings, unless the app was opened on a specific page.
+if (window.location.pathname === "/" && appearance().startTab !== "today") {
+  window.history.replaceState(null, "", TAB_PATH[appearance().startTab]);
+}
 
 export default function App() {
   const path = usePath();
-  const route = pageKey(path);
+  const route = useMemo(() => parse(path), [path]);
   const personal = usePersonal();
+  const look = useAppearance();
 
   // Pull personal data (saved, notes, settings) once on start; it also syncs on focus.
   useEffect(() => {
     void sync();
   }, []);
 
-  const [items, setItems] = useState<Hackathon[]>([]);
+  // ------------------------------------------------------------ data
+  const [all, setAll] = useState<Hackathon[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
   const [slow, setSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [filters, setFiltersState] = useState<Filters>(loadFilters);
-  const [page, setPage] = useState(1);
+  const [newSince] = useState(lastVisit);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -52,7 +67,7 @@ export default function App() {
     setSlow(false);
     const slowTimer = setTimeout(() => setSlow(true), 2500);
     fetchData<ListResponse>("list.json", "/hackathons?limit=500", ctrl.signal)
-      .then((r) => setItems(r.items))
+      .then((r) => setAll(r.items))
       .catch((e) => !ctrl.signal.aborted && setError(e instanceof Error ? e.message : String(e)))
       .finally(() => {
         clearTimeout(slowTimer);
@@ -67,7 +82,7 @@ export default function App() {
           Promise.all([fetchJSON<ListResponse>("/hackathons?limit=500", ctrl.signal), fetchJSON<Meta>("/meta", ctrl.signal)])
             .then(([list, fresh]) => {
               if (Date.parse(fresh.last_refresh ?? "") > Date.parse(m.last_refresh ?? "")) {
-                setItems(list.items);
+                setAll(list.items);
                 setMeta(fresh);
               }
             })
@@ -86,135 +101,139 @@ export default function App() {
     saveFilters(f);
   }, []);
 
-  // "Not interested" hackathons stay out of the list (they're on My hackathons).
-  const visible = useMemo(
-    () => applyFilters(items.filter((h) => personal.items[h.id]?.status !== "hidden"), filters),
-    [items, filters, personal.items],
-  );
-  const live = useMemo(() => new Map(items.map((h) => [h.id, h])), [items]);
+  // A notification for several new matches opens /explore?new=1.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (route.tab === "explore" && params.get("new") === "1") {
+      setFilters({ ...DEFAULT_FILTERS, sort: filters.sort, newOnly: true });
+      window.history.replaceState(window.history.state, "", "/explore");
+    }
+  }, [route.tab, setFilters, filters.sort]);
+
+  const live = useMemo(() => new Map(all.map((h) => [h.id, h])), [all]);
+  // "Not interested" hackathons stay out of every list (they're under Saved > Hidden).
+  const items = useMemo(() => all.filter((h) => personal.items[h.id]?.status !== "hidden"), [all, personal.items]);
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
-    items.forEach((h) => h.categories.forEach((c) => counts.set(c, (counts.get(c) ?? 0) + 1)));
+    all.forEach((h) => h.categories.forEach((c) => counts.set(c, (counts.get(c) ?? 0) + 1)));
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([category, count]) => ({ category, count }));
-  }, [items]);
-
-  // Page transitions run in two steps so the two pages are never on screen
-  // together: the current page fades out, then the next one fades in. Each step
-  // is a plain timer plus a CSS animation, never an animation callback, so a
-  // dropped frame or a paused tab can't leave the screen blank: if a fade
-  // doesn't run, the page simply shows at full opacity. The list stays mounted
-  // (hidden) under the detail page, so going back restores its scroll position
-  // and briefly marks the hackathon you came back from.
-  const reduced = useReducedMotion();
-  const [view, setView] = useState<PageKey>(route); // null for the list
-  const [leaving, setLeaving] = useState(false);
-  const [highlight, setHighlight] = useState<string | null>(null);
-  const listScroll = useRef(0);
-  const focusSearch = useRef(false);
-  const timer = useRef<number>();
-
-  useEffect(() => {
-    window.clearTimeout(timer.current);
-    if (route === view) {
-      // Navigated back before the fade finished: stay on this page.
-      setLeaving(false);
-      return;
-    }
-    if (view === null) listScroll.current = window.scrollY;
-    setLeaving(true);
-    timer.current = window.setTimeout(
-      () => {
-        setLeaving(false);
-        setHighlight(route === null && view?.startsWith("h:") ? view.slice(2) : null);
-        setView(route);
-      },
-      reduced ? 0 : LEAVE_MS,
-    );
-    return () => window.clearTimeout(timer.current);
-  }, [route, view, reduced]);
-
-  useLayoutEffect(() => {
-    if (view !== null) {
-      window.scrollTo(0, 0);
-      return;
-    }
-    window.scrollTo(0, listScroll.current);
-    if (focusSearch.current) {
-      focusSearch.current = false;
-      const input = document.querySelector<HTMLInputElement>("#discovery-search");
-      input?.focus();
-      input?.setSelectionRange(input.value.length, input.value.length);
-    }
-  }, [view]);
-
-  useEffect(() => {
-    if (!highlight) return;
-    const t = setTimeout(() => setHighlight(null), 2200);
-    return () => clearTimeout(t);
-  }, [highlight]);
-
-  const onDetailSearch = useCallback(
-    (q: string) => {
-      setFilters({ ...filters, q });
-      setPage(1);
-      // Keep typing in the list's search box, which shows the results live.
-      focusSearch.current = true;
-      navigate("/");
-      listScroll.current = 0;
-    },
-    [filters, setFilters],
-  );
-
-  const lastRefresh = meta?.last_refresh ?? null;
+  }, [all]);
   const warning = useMemo(() => healthWarning(meta), [meta]);
 
+  const data: AppData = useMemo(
+    () => ({ items, live, meta, loading, slow, error, retry: () => setReload((n) => n + 1), filters, setFilters, newSince, categories, warning }),
+    [items, live, meta, loading, slow, error, filters, setFilters, newSince, categories, warning],
+  );
+
+  // ------------------------------------------------------------ badge
+  const closingSaved = useMemo(
+    () =>
+      Object.entries(personal.items).filter(([id, t]) => {
+        if (t.status !== "saved" && t.status !== "registered") return false;
+        const h = live.get(id) ?? t.hackathon;
+        const d = h ? daysLeft(h) : null;
+        return d !== null && d >= 0 && d < 7;
+      }).length,
+    [personal.items, live],
+  );
+  useEffect(() => setBadge(look.badge ? closingSaved : 0), [closingSaved, look.badge]);
+
+  // ------------------------------------------------------------ tabs and scroll
+  const scrolls = useRef<Partial<Record<Tab, number>>>({});
+  const shownTab = useRef<Tab>(route.tab);
+  const overlayOpen = useRef(!!route.overlay);
+  overlayOpen.current = !!route.overlay;
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (!overlayOpen.current) scrolls.current[shownTab.current] = window.scrollY;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (shownTab.current !== route.tab) {
+      shownTab.current = route.tab;
+      window.scrollTo(0, scrolls.current[route.tab] ?? 0);
+    }
+  }, [route.tab]);
+
+  const onReselect = useCallback((t: Tab) => {
+    if (t === shownTab.current) window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  // ------------------------------------------------------------ overlay motion
+  const width = typeof window !== "undefined" ? window.innerWidth : 390;
+  const overlayX = useMotionValue(width);
+  const underX = useTransform(overlayX, [0, width], [-width * 0.22, 0]);
+  const dim = useTransform(overlayX, [0, width], [1, 0]);
+
+  let page: ReactNode;
+  if (route.tab === "today") page = <Today />;
+  else if (route.tab === "explore") page = <Explore />;
+  else if (route.tab === "saved") page = <Saved />;
+  else page = <SettingsTab />;
+
+  let overlay: ReactNode = null;
+  if (route.overlay?.kind === "detail") {
+    const id = route.overlay.id;
+    overlay = <Detail id={id} initial={live.get(id) ?? personal.items[id]?.hackathon} />;
+  } else if (route.overlay?.kind === "appearance") overlay = <AppearancePage />;
+  else if (route.overlay?.kind === "notifications") overlay = <NotificationsPage />;
+  else if (route.overlay?.kind === "email") overlay = <EmailAlertsPage />;
+
   return (
-    <MotionConfig reducedMotion="user">
-      <div className="min-h-screen bg-canvas wide:px-4 wide:py-4">
-        <div className="relative mx-auto min-h-screen max-w-[1220px] overflow-clip bg-white wide:min-h-[calc(100vh-2rem)] wide:rounded-[10px] wide:border wide:border-line wide:shadow-[0_1px_2px_rgba(10,16,51,0.04)]">
-          <div hidden={view !== null} className={view === null ? (leaving ? "page-leave" : "page-enter") : undefined}>
-            <Discovery
-              items={visible}
-              totalCount={items.length}
-              loading={loading}
-              slow={slow}
-              error={error}
-              onRetry={() => setReload((n) => n + 1)}
-              filters={filters}
-              setFilters={setFilters}
-              categories={categories}
-              lastRefresh={lastRefresh}
-              firstRunAt={meta?.first_run_at ?? null}
-              warning={warning}
-              page={page}
-              setPage={setPage}
-              highlightId={highlight}
-            />
-          </div>
-          {view === "me" && (
-            <div key="me" className={leaving ? "page-leave" : "page-enter-fade"}>
-              <MyHackathons live={live} />
-            </div>
+    <DataContext.Provider value={data}>
+      <MotionConfig reducedMotion="user">
+        <motion.div style={{ x: underX }} className="min-h-dvh will-change-transform">
+          <motion.main key={route.tab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, ease: "easeOut" }} className="mx-auto max-w-[720px]">
+            {page}
+          </motion.main>
+        </motion.div>
+        <motion.div aria-hidden="true" style={{ opacity: dim, background: "var(--scrim)" }} className="pointer-events-none fixed inset-0 z-40" />
+        <TabBar active={route.tab} hidden={!!route.overlay} badge={closingSaved} onReselect={onReselect} />
+        <AnimatePresence>
+          {overlay && (
+            <OverlayLayer key={route.key} x={overlayX} width={width}>
+              {overlay}
+            </OverlayLayer>
           )}
-          {view === "settings" && (
-            <div key="settings" className={leaving ? "page-leave" : "page-enter-fade"}>
-              <SettingsPage categories={meta?.categories.map((c) => c.category) ?? categories.map((c) => c.category)} />
-            </div>
-          )}
-          {view?.startsWith("h:") && (
-            <div key={view} className={leaving ? "page-leave" : "page-enter-fade"}>
-              <Details
-                id={view.slice(2)}
-                initial={live.get(view.slice(2)) ?? personal.items[view.slice(2)]?.hackathon}
-                totalCount={items.length || meta?.active_count || 0}
-                lastRefresh={lastRefresh}
-                query=""
-                onSearch={onDetailSearch}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    </MotionConfig>
+        </AnimatePresence>
+        <ToastView />
+      </MotionConfig>
+    </DataContext.Provider>
+  );
+}
+
+/**
+ * A page sliding in from the right, iOS style. Drag from the left edge to go
+ * back: past a third of the screen (or a quick flick) it leaves, otherwise it
+ * springs back.
+ */
+function OverlayLayer({ x, width, children }: { x: MotionValue<number>; width: number; children: ReactNode }) {
+  useEffect(() => {
+    const root = document.documentElement;
+    const prev = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = prev;
+    };
+  }, []);
+
+  const onEdge = dragHandle(x, { axis: "x", distance: () => width * 0.33, spring: pageSpring as ValueAnimationTransition, onCommit: () => goBack() });
+
+  return (
+    <motion.div
+      style={{ x }}
+      initial={{ x: width }}
+      animate={{ x: 0 }}
+      exit={{ x: width }}
+      transition={pageSpring}
+      className="fixed inset-0 z-50 overflow-hidden bg-bg shadow-[-12px_0_40px_rgba(0,0,0,0.18)]"
+    >
+      {children}
+      <div aria-hidden="true" className="absolute inset-y-0 left-0 z-40 w-5 touch-none" onPointerDown={onEdge} />
+    </motion.div>
   );
 }

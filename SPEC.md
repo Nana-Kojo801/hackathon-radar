@@ -157,3 +157,10 @@ The plan for a multi-user Phase 2 was dropped: the app stays personal. No sign-u
 - **Share** sends the hackathon's own page, not the app's.
 
 Dropped: sign-up and sign-in, per-user accounts, a public version, a "fits me" ranking from a profile, and Telegram (email instead).
+
+## 17. Phase 3: iPhone-style app (built)
+- **Redesign:** an iPhone-style UI, phone first: Today (home), Explore, Saved and Settings tabs; hackathon pages that slide in; a floating glass tab bar; swipe to save or hide; sheets for filters; real cover art.
+- **Customisable:** theme (Automatic/Light/Dark), six accent colours, Liquid Glass on/off, text size, list density, home-screen icon and the tab the app opens on.
+- **Motion:** smooth, slightly bouncy, firm springs throughout; swipe from the left edge to go back; respects Reduce Motion.
+- **Push notifications** to the installed app: new matches, big new prizes, closing soon, an optional weekly summary, quiet hours, and a badge on the app icon.
+- **Email** restyled to match the app.
