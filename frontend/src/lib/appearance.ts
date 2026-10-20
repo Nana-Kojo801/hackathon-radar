@@ -20,7 +20,7 @@ export const ACCENTS = [
   { id: "pink", name: "Pink", hex: "#D6336C" },
   { id: "graphite", name: "Graphite", hex: "#48484A" },
 ] as const;
-export type AccentId = (typeof ACCENTS)[number]["id"];
+export type AccentId = (typeof ACCENTS)[number]["id"] | "custom";
 
 export const TEXT_SIZES = [
   { name: "Extra small", scale: 0.88 },
@@ -40,6 +40,8 @@ export interface Appearance {
   startTab: StartTab;
   /** Show the icon badge with saved hackathons closing this week. */
   badge: boolean;
+  /** The colour picked with "Custom", used when accent is "custom". */
+  customAccent: string;
 }
 
 const DEFAULTS: Appearance = {
@@ -51,6 +53,7 @@ const DEFAULTS: Appearance = {
   icon: "classic",
   startTab: "today",
   badge: true,
+  customAccent: "#7C3AED",
 };
 
 const KEY = "hackathon-radar:appearance:v1";
@@ -105,7 +108,31 @@ export function mix(hex: string, to: number, t: number): string {
 }
 
 export function accentHex(id: AccentId): string {
+  if (id === "custom") return /^#[0-9a-f]{6}$/i.test(state.customAccent) ? state.customAccent : DEFAULTS.customAccent;
   return ACCENTS.find((a) => a.id === id)?.hex ?? ACCENTS[0].hex;
+}
+
+function luminance(hex: string): number {
+  const n = parseInt(hex.slice(1, 7), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+export function contrast(a: string, b: string): number {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+}
+
+/** Nudge a colour towards black (light theme) or white (dark theme) until text in it reads on `bg`. */
+function readable(hex: string, bg: string, towards: number, start = 0): string {
+  for (let t = start; t <= 1; t += 0.05) {
+    const c = mix(hex, towards, t);
+    if (contrast(c, bg) >= 4.5) return c;
+  }
+  return towards ? "#ffffff" : "#000000";
 }
 
 const darkQuery = typeof window !== "undefined" ? window.matchMedia("(prefers-color-scheme: dark)") : null;
@@ -121,14 +148,16 @@ export function apply(): void {
   const root = document.documentElement;
   const dark = isDark();
   const accent = accentHex(state.accent);
-  const tint = dark ? mix(accent, 255, 0.4) : accent;
+  // Any colour can be picked, so text colours derived from it are checked for contrast.
+  const tint = dark ? readable(accent, "#1c1c1e", 255, 0.4) : readable(accent, "#ffffff", 0);
   root.dataset.theme = dark ? "dark" : "light";
   root.dataset.glass = state.liquidGlass ? "liquid" : "frosted";
   root.dataset.density = state.density;
   root.style.setProperty("--accent", accent);
   root.style.setProperty("--accent-hi", mix(accent, 255, 0.3));
   root.style.setProperty("--tint", tint);
-  root.style.setProperty("--ink", dark ? mix(accent, 255, 0.55) : mix(accent, 0, 0.2));
+  root.style.setProperty("--ink", dark ? readable(accent, "#2c2c2e", 255, 0.55) : readable(accent, "#eef0f8", 0, 0.2));
+  root.style.setProperty("--on-accent", contrast(accent, "#ffffff") >= contrast(accent, "#000000") ? "#ffffff" : "#000000");
   root.style.setProperty("--soft", tint + (dark ? "33" : "17"));
   root.style.setProperty("--ts", String(TEXT_SIZES[state.textSize]?.scale ?? 1));
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#000000" : "#f2f2f7");
@@ -145,14 +174,14 @@ darkQuery?.addEventListener("change", () => {
 
 // ---------------------------------------------------------------- icons
 
-/** The radar mark on a canvas: rings, a sweep and a blip. */
+/** The app mark (components/Icon.tsx) on a canvas, in the chosen style. */
 export function drawIcon(size: number, style: IconStyle, accentId: AccentId = state.accent): HTMLCanvasElement {
   const accent = accentHex(accentId);
   const c = document.createElement("canvas");
   c.width = c.height = size;
   const g = c.getContext("2d")!;
   if (style === "classic") {
-    const grad = g.createLinearGradient(0, 0, size * 0.4, size);
+    const grad = g.createLinearGradient(0, 0, size, size);
     grad.addColorStop(0, mix(accent, 255, 0.3));
     grad.addColorStop(1, accent);
     g.fillStyle = grad;
@@ -160,33 +189,22 @@ export function drawIcon(size: number, style: IconStyle, accentId: AccentId = st
     g.fillStyle = style === "light" ? "#ffffff" : "#000000";
   }
   g.fillRect(0, 0, size, size);
-  const fg = style === "classic" ? "#ffffff" : style === "light" ? accent : mix(accent, 255, 0.4);
-  const u = size / 24;
-  const cx = 12 * u;
+  const fg = style === "classic" ? "#ffffff" : style === "light" ? accent : "#ffffff";
+  const wave = style === "dark" ? mix(accent, 255, 0.35) : fg;
+  // The mark fills 70% of the icon, centred.
+  const scale = (size * 0.7) / 24;
+  g.translate(size * 0.15, size * 0.15);
+  g.scale(scale, scale);
   g.lineCap = "round";
+  g.lineJoin = "round";
   g.strokeStyle = fg;
-  g.lineWidth = 1.7 * u * 0.62;
-  g.globalAlpha = 0.4;
-  g.beginPath();
-  g.arc(cx, cx, 8.5 * u * 0.62, 0, Math.PI * 2);
-  g.stroke();
-  g.globalAlpha = 0.7;
-  g.beginPath();
-  g.arc(cx, cx, 4.6 * u * 0.62, 0, Math.PI * 2);
-  g.stroke();
-  g.globalAlpha = 1;
-  g.lineWidth = 2.1 * u * 0.62;
-  g.beginPath();
-  g.moveTo(cx, cx);
-  g.lineTo(cx + 6 * u * 0.62, cx - 6 * u * 0.62);
-  g.stroke();
-  g.fillStyle = fg;
-  g.beginPath();
-  g.arc(cx, cx, 1.7 * u * 0.62, 0, Math.PI * 2);
-  g.fill();
-  g.beginPath();
-  g.arc(cx + 3.7 * u * 0.62, cx + 3.3 * u * 0.62, 1.2 * u * 0.62, 0, Math.PI * 2);
-  g.fill();
+  g.lineWidth = 3.1;
+  g.stroke(new Path2D("M5.6 6.2v11.6M12.6 6.2v11.6M5.6 12h7"));
+  g.strokeStyle = wave;
+  g.lineWidth = 2.1;
+  g.stroke(new Path2D("M16.2 9.4a3.7 3.7 0 0 1 0 5.2"));
+  g.globalAlpha = 0.55;
+  g.stroke(new Path2D("M18.7 6.9a7.3 7.3 0 0 1 0 10.2"));
   return c;
 }
 

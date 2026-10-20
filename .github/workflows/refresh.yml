@@ -37,6 +37,7 @@ jobs:
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o-mini' }}
           MAX_ENRICH_PER_RUN: ${{ vars.MAX_ENRICH_PER_RUN || '60' }}
           MAX_DISCOVERY_PAGES: ${{ vars.MAX_DISCOVERY_PAGES || '12' }}
+          MAX_POLISH_PER_RUN: ${{ vars.MAX_POLISH_PER_RUN || '40' }}
           SOURCES: ${{ github.event.inputs.sources }}
         run: |
           if [ -z "$DATABASE_URL" ]; then

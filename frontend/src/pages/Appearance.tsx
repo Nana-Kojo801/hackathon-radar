@@ -79,7 +79,7 @@ export function AppearancePage() {
                   <span className="absolute right-3.5 bottom-[7px] left-3.5 h-[9px] rounded-full bg-accent" />
                 </motion.span>
                 <span className="text-subhead font-medium">{label}</span>
-                <span className={cn("flex h-[22px] w-[22px] items-center justify-center rounded-full text-white", on ? "bg-accent" : "border-[1.5px] border-label-2")}>
+                <span className={cn("flex h-[22px] w-[22px] items-center justify-center rounded-full text-on-accent", on ? "bg-accent" : "border-[1.5px] border-label-2")}>
                   {on && (
                     <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={bouncy}>
                       <Icon name="check" size={13} stroke={3.4} />
@@ -117,8 +117,8 @@ export function AppearancePage() {
           </div>
         </section>
 
-        <Label right={ACCENTS.find((a) => a.id === look.accent)?.name}>Accent colour</Label>
-        <section role="radiogroup" aria-label="Accent colour" className="card mx-4 grid grid-cols-6 gap-1 rounded-[22px] px-3 pt-[18px] pb-4">
+        <Label right={look.accent === "custom" ? `Custom ${look.customAccent.toUpperCase()}` : ACCENTS.find((a) => a.id === look.accent)?.name}>Accent colour</Label>
+        <section role="radiogroup" aria-label="Accent colour" className="card mx-4 grid grid-cols-7 gap-0.5 rounded-[22px] px-2 pt-[18px] pb-4">
           {ACCENTS.map((a) => {
             const on = a.id === look.accent;
             const color = dark ? mix(a.hex, 255, 0.25) : a.hex;
@@ -127,7 +127,7 @@ export function AppearancePage() {
                 <motion.span
                   animate={{ boxShadow: on ? `0 0 0 3px var(--card), 0 0 0 5.5px ${color}` : `0 0 0 0px var(--card), 0 0 0 0px ${color}` }}
                   transition={bouncy}
-                  className="flex h-[38px] w-[38px] items-center justify-center rounded-full text-white"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-white"
                   style={{ background: color }}
                 >
                   {on && (
@@ -140,6 +140,7 @@ export function AppearancePage() {
               </motion.button>
             );
           })}
+          <CustomSwatch />
         </section>
 
         <Label right={TEXT_SIZES[look.textSize]?.name}>Text size</Label>
@@ -197,7 +198,8 @@ export function AppearancePage() {
           ).map(([v, label]) => {
             const on = look.icon === v;
             const bg = v === "classic" ? `linear-gradient(160deg, ${mix(accent, 255, 0.3)} 0%, ${accent} 100%)` : v === "light" ? "#fff" : "#000";
-            const fg = v === "classic" ? "#fff" : v === "light" ? accent : mix(accent, 255, 0.4);
+            const fg = v === "light" ? accent : "#fff";
+            const wave = v === "dark" ? mix(accent, 255, 0.35) : fg;
             return (
               <motion.button key={v} type="button" role="radio" aria-checked={on} whileTap={press} transition={bouncy} onClick={() => setAppearance({ icon: v })} className="flex flex-col items-center gap-2.5">
                 <motion.span
@@ -206,7 +208,7 @@ export function AppearancePage() {
                   className="flex h-[62px] w-[62px] items-center justify-center rounded-[15px]"
                   style={{ background: bg, boxShadow: on ? `0 0 0 3px var(--card), 0 0 0 5.5px var(--accent)` : "0 0 0 0.5px var(--sep)" }}
                 >
-                  <RadarMark size={40} color={fg} />
+                  <RadarMark size={40} color={fg} wave={wave} />
                 </motion.span>
                 <span className={cn("text-subhead", on ? "font-semibold" : "font-medium")}>{label}</span>
               </motion.button>
@@ -216,5 +218,40 @@ export function AppearancePage() {
         <p className="mx-8 mt-1.5 text-footnote text-label-2">The new icon appears after you remove the app from your Home Screen and add it again.</p>
       </div>
     </OverlayPage>
+  );
+}
+
+/** Any colour: the swatch opens the system colour picker; the pick becomes the accent right away. */
+function CustomSwatch() {
+  const look = useAppearance();
+  const on = look.accent === "custom";
+  const dark = isDark(look);
+  const color = dark ? mix(look.customAccent, 255, 0.25) : look.customAccent;
+  return (
+    <label className="relative flex cursor-pointer flex-col items-center gap-2" onClick={() => !on && setAppearance({ accent: "custom" })}>
+      <input
+        type="color"
+        value={look.customAccent}
+        onChange={(e) => setAppearance({ accent: "custom", customAccent: e.target.value })}
+        aria-label="Custom accent colour"
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
+      <motion.span
+        animate={{ boxShadow: on ? `0 0 0 3px var(--card), 0 0 0 5.5px ${color}` : "0 0 0 0px var(--card), 0 0 0 0px transparent" }}
+        transition={bouncy}
+        whileTap={{ scale: 0.85 }}
+        className="pointer-events-none flex h-9 w-9 items-center justify-center rounded-full"
+        style={{ background: on ? color : "conic-gradient(from 180deg, #ff3b30, #ff9500, #ffcc00, #34c759, #00c7be, #007aff, #5856d6, #af52de, #ff2d55, #ff3b30)" }}
+      >
+        {on ? (
+          <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={bouncy} style={{ color: "var(--on-accent)" }}>
+            <Icon name="pencil" size={15} stroke={2.6} />
+          </motion.span>
+        ) : (
+          <span className="h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.3)]" />
+        )}
+      </motion.span>
+      <span className="pointer-events-none text-[11.5px] font-medium text-label-2">Custom</span>
+    </label>
   );
 }

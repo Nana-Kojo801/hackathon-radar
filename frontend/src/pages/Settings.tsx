@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AppIcon, Icon } from "../components/Icon";
 import { CompactBar, Group, LargeTitle, Menu, RowLink, RowMenu, RowToggle, useScrolled } from "../components/kit";
 import { ACCENTS, setAppearance, type StartTab, useAppearance } from "../lib/appearance";
-import { compactMoney, timeAgo } from "../lib/format";
+import { compactMoney, countdown, nextRefresh, timeAgo } from "../lib/format";
 import { bouncy, press, spring } from "../lib/motion";
 import { connect, disconnect, KeyError, type Settings as ServerSettings, updateSettings, usePersonal } from "../lib/personal";
 import { usePushStatus } from "../lib/push";
@@ -41,7 +41,7 @@ export function SettingsTab() {
   const s = p.settings;
   const off = !p.key || !s;
   const set = (patch: Partial<ServerSettings>) => updateSettings(patch);
-  const accentName = ACCENTS.find((a) => a.id === look.accent)?.name ?? "";
+  const accentName = look.accent === "custom" ? "Custom" : (ACCENTS.find((a) => a.id === look.accent)?.name ?? "");
   const themeName = look.theme === "system" ? "Automatic" : look.theme === "dark" ? "Dark" : "Light";
   const failing = d.warning;
 
@@ -88,6 +88,7 @@ export function SettingsTab() {
 
       <Group header="Data" footer="Listings refresh every 6 hours from Devpost, Devfolio, MLH, TAIKAI, ETHGlobal, Unstop and the web.">
         <RowLink icon="refresh" iconBg="#8E8E93" label="Last refresh" value={timeAgo(d.meta?.last_refresh)} chevron={false} />
+        <NextRefresh last={d.meta?.last_refresh} />
         <RowLink icon={failing ? "alert" : "check"} iconBg={failing ? "#FF9500" : "#8E8E93"} label="Sources" hint={failing?.text} value={failing ? undefined : "All healthy"} chevron={false} />
       </Group>
 
@@ -160,7 +161,7 @@ function ConnectCard() {
         whileTap={press}
         transition={bouncy}
         disabled={busy || !key.trim()}
-        className="mt-3 flex h-11 w-full items-center justify-center rounded-full bg-accent text-subhead font-semibold text-white disabled:opacity-45"
+        className="mt-3 flex h-11 w-full items-center justify-center rounded-full bg-accent text-subhead font-semibold text-on-accent disabled:opacity-45"
       >
         {busy ? "Checking…" : "Connect"}
       </motion.button>
@@ -168,5 +169,26 @@ function ConnectCard() {
         It's the <code className="rounded bg-fill px-1">PERSONAL_KEY</code> value on Render. This device remembers it.
       </p>
     </motion.form>
+  );
+}
+
+/** A live countdown to the next scheduled refresh, so it's clear how fresh the list is. */
+function NextRefresh({ last }: { last: string | null | undefined }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const next = nextRefresh(last, now);
+  const at = new Date(next.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return (
+    <RowLink
+      icon="clock"
+      iconBg="#007AFF"
+      label="Next refresh"
+      hint={next.due ? "Running now. GitHub sometimes starts it a little late." : `Around ${at}`}
+      value={next.due ? "Any minute" : <span className="tabular">{countdown(next.at - now)}</span>}
+      chevron={false}
+    />
   );
 }

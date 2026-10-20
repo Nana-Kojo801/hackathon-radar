@@ -78,6 +78,8 @@ Cost guards (important, the budget is small):
 - `MAX_ENRICH_PER_RUN` env var, default 60.
 - Truncate descriptions to about 2,000 characters before sending.
 - Log tokens used per run.
+
+A second, separate step (`pipeline/polish.py`) tidies each open listing's description into Markdown and reads its prizes (name, track, rank, amount, winners, perks). It runs once per description, at most `MAX_POLISH_PER_RUN` (default 40) per run.
 - If the OpenAI call fails, store the listing without enrichment and retry next run.
 
 ## 8. Data model (Postgres)

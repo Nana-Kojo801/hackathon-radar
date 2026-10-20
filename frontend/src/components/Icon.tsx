@@ -43,6 +43,10 @@ const PATHS = {
   copy: "M9 9h10.5a1.5 1.5 0 0 1 1.5 1.5V20a1.5 1.5 0 0 1-1.5 1.5H10.5A1.5 1.5 0 0 1 9 20zM15 9V4.5A1.5 1.5 0 0 0 13.5 3H4.5A1.5 1.5 0 0 0 3 4.5v9A1.5 1.5 0 0 0 4.5 15H9",
   plus: "M12 5v14M5 12h14",
   mic: "M9 2.5h6v12H9zM5 11a7 7 0 0 0 14 0M12 18v3.5",
+  ticket: "M3 7.5A1.5 1.5 0 0 1 4.5 6h15A1.5 1.5 0 0 1 21 7.5V10a2 2 0 0 0 0 4v2.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 16.5V14a2 2 0 0 0 0-4zM14.5 6v2.5M14.5 11v2M14.5 15.5V18",
+  send: "M21.5 2.5 10.5 13.5M21.5 2.5l-7 19-4-8-8-4z",
+  flag: "M5 21V4M5 4.5c3-2 6 2 9 0s4-1 5-1v9c-1 0-2-1-5 1s-6-2-9 0",
+  sparkle: "M12 3l1.8 5.4a2 2 0 0 0 1.3 1.3L20.5 11.5l-5.4 1.8a2 2 0 0 0-1.3 1.3L12 20l-1.8-5.4a2 2 0 0 0-1.3-1.3L3.5 11.5l5.4-1.8a2 2 0 0 0 1.3-1.3z",
 } as const;
 
 export type IconName = keyof typeof PATHS;
@@ -75,15 +79,16 @@ export function Icon({ name, size = 20, stroke = 2, filled, ...rest }: { name: I
   );
 }
 
-/** The app mark: radar rings, a sweep and a blip. */
-export function RadarMark({ size = 24, color = "currentColor" }: { size?: number; color?: string }) {
+/** The app mark: a bold H sending out a signal. Paths on a 24px grid, shared with the canvas icon. */
+export const MARK_H = "M5.6 6.2v11.6M12.6 6.2v11.6M5.6 12h7";
+export const MARK_WAVES = ["M16.2 9.4a3.7 3.7 0 0 1 0 5.2", "M18.7 6.9a7.3 7.3 0 0 1 0 10.2"];
+
+export function RadarMark({ size = 24, color = "currentColor", wave }: { size?: number; color?: string; wave?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="8.5" strokeOpacity="0.4" />
-      <circle cx="12" cy="12" r="4.6" strokeOpacity="0.7" />
-      <path d="M12 12 18 6" strokeWidth="2.1" />
-      <circle cx="12" cy="12" r="1.7" fill={color} stroke="none" />
-      <circle cx="15.7" cy="15.3" r="1.2" fill={color} stroke="none" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={MARK_H} strokeWidth="3.1" />
+      <path d={MARK_WAVES[0]} strokeWidth="2.1" stroke={wave ?? color} />
+      <path d={MARK_WAVES[1]} strokeWidth="2.1" stroke={wave ?? color} strokeOpacity="0.55" />
     </svg>
   );
 }
@@ -100,7 +105,7 @@ export function AppIcon({ size = 58, radius }: { size?: number; radius?: number 
         boxShadow: "inset 0 0 0 0.5px rgba(255,255,255,0.2)",
       }}
     >
-      <RadarMark size={size * 0.62} color="#fff" />
+      <RadarMark size={size * 0.7} color="#fff" />
     </span>
   );
 }

@@ -265,3 +265,28 @@ export const GLYPH = {
   book: "M4 4.5A2.5 2.5 0 0 1 6.5 2H20v16H6.5A1.5 1.5 0 0 0 5 19.5 1.5 1.5 0 0 0 6.5 21H20v1H6.5A2.5 2.5 0 0 1 4 19.5z",
   globe: "M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19zm-1.4 2.1A7.5 7.5 0 0 0 4.6 11h3.3c.1-2.4.9-4.6 2.7-6.4zm2.8 0c1.8 1.8 2.6 4 2.7 6.4h3.3a7.5 7.5 0 0 0-6-6.4zM12 5.4c-1.4 1.6-2.1 3.5-2.1 5.6h4.2c0-2.1-.7-4-2.1-5.6zM4.6 13a7.5 7.5 0 0 0 6 6.4c-1.8-1.8-2.6-4-2.7-6.4zm5.3 0c0 2.1.7 4 2.1 5.6 1.4-1.6 2.1-3.5 2.1-5.6zm6.2 0c-.1 2.4-.9 4.6-2.7 6.4a7.5 7.5 0 0 0 6-6.4z",
 } as const;
+
+/** The pipeline runs at :17 past every sixth hour UTC (.github/workflows/refresh.yml). */
+const RUN_EVERY_H = 6;
+const RUN_MINUTE = 17;
+
+/**
+ * When the next refresh is due. GitHub often starts scheduled runs late, so if
+ * the latest slot has passed but no refresh has landed since, it is "due" (the
+ * run is queued or in progress) for up to 90 minutes.
+ */
+export function nextRefresh(lastRefresh: string | null | undefined, now = Date.now()): { at: number; due: boolean } {
+  const d = new Date(now);
+  const slot = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), Math.floor(d.getUTCHours() / RUN_EVERY_H) * RUN_EVERY_H, RUN_MINUTE);
+  const last = slot > now ? slot - RUN_EVERY_H * 3_600_000 : slot;
+  const ran = lastRefresh ? Date.parse(lastRefresh) >= last - 5 * 60_000 : false;
+  if (!ran && now - last < 90 * 60_000) return { at: last, due: true };
+  return { at: last + RUN_EVERY_H * 3_600_000, due: false };
+}
+
+/** 7_380_000 → "2:03:00". */
+export function countdown(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
+}

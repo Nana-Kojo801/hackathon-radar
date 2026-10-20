@@ -1,12 +1,12 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
-import { AnimatePresence, motion, useMotionValue, type ValueAnimationTransition } from "framer-motion";
-import { type ReactNode, type RefObject, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { Hackathon } from "../lib/api";
-import { dragHandle } from "../lib/gesture";
 import { dueTag, fallbackArt, imageOf } from "../lib/format";
-import { bouncy, press, pressSmall, sheetSpring, spring } from "../lib/motion";
+import { bouncy, press, pressSmall, spring } from "../lib/motion";
+import { slide } from "../lib/transition";
 import { type Stage, stageLabel } from "../lib/personal";
 import { linkTo } from "../lib/router";
 import { useToast } from "../lib/toast";
@@ -73,7 +73,7 @@ export function PrimaryButton({
 }) {
   const cls = cn(
     "flex h-[52px] items-center justify-center gap-2 rounded-full px-6 text-body font-semibold outline-none select-none",
-    tone === "accent" ? "bg-accent text-white" : "bg-fill text-label",
+    tone === "accent" ? "bg-accent text-on-accent" : "bg-fill text-label",
     disabled && "pointer-events-none opacity-45",
     className,
   );
@@ -403,7 +403,12 @@ export interface MenuItem<T extends string> {
   destructive?: boolean;
 }
 
-/** A popover menu that springs out of its button, iOS context-menu style. */
+/**
+ * A popover menu that springs out of its button, iOS context-menu style. The
+ * animation is CSS (index.css, .menu): Radix starts it only once the menu is
+ * in place, so it never flashes at the wrong spot, and it runs on the
+ * compositor.
+ */
 export function Menu<T extends string>({
   trigger,
   items,
@@ -423,49 +428,41 @@ export function Menu<T extends string>({
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>{trigger}</Popover.Trigger>
-      <AnimatePresence>
-        {open && (
-          <Popover.Portal forceMount>
-            <Popover.Content asChild forceMount align={align} sideOffset={8} collisionPadding={12}>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.6, filter: "blur(4px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.14 } }}
-                transition={bouncy}
-                style={{ transformOrigin: "var(--radix-popover-content-transform-origin)" }}
-                className="glass z-[70] min-w-[230px] overflow-hidden rounded-[18px] py-1.5 outline-none"
-              >
-                {title && <div className="px-4 pt-1.5 pb-1 text-footnote text-label-2">{title}</div>}
-                {items.map((it) => (
-                  <button
-                    key={it.value}
-                    type="button"
-                    onClick={() => {
-                      onSelect(it.value);
-                      setOpen(false);
-                    }}
-                    className={cn(
-                      "flex w-full items-center gap-3 px-4 py-[11px] text-left text-body tracking-[-0.02em] outline-none active:bg-fill",
-                      it.destructive ? "text-red" : "text-label",
-                    )}
-                  >
-                    <span className="flex w-4 shrink-0 justify-center">{value === it.value && <Icon name="check" size={16} stroke={2.6} />}</span>
-                    <span className="flex-1">{it.label}</span>
-                    {it.icon && <Icon name={it.icon} size={19} className="shrink-0" />}
-                  </button>
-                ))}
-              </motion.div>
-            </Popover.Content>
-          </Popover.Portal>
-        )}
-      </AnimatePresence>
+      <Popover.Portal>
+        <Popover.Content align={align} sideOffset={8} collisionPadding={12} className="menu glass z-[70] min-w-[230px] overflow-hidden rounded-[18px] py-1.5 outline-none">
+          {title && <div className="px-4 pt-1.5 pb-1 text-footnote text-label-2">{title}</div>}
+          {items.map((it) => (
+            <button
+              key={it.value}
+              type="button"
+              onClick={() => {
+                onSelect(it.value);
+                setOpen(false);
+              }}
+              className={cn(
+                "flex w-full items-center gap-3 px-4 py-[11px] text-left text-body tracking-[-0.02em] outline-none active:bg-fill",
+                it.destructive ? "text-red" : "text-label",
+              )}
+            >
+              <span className="flex w-4 shrink-0 justify-center">{value === it.value && <Icon name="check" size={16} stroke={2.6} />}</span>
+              <span className="flex-1">{it.label}</span>
+              {it.icon && <Icon name={it.icon} size={19} className="shrink-0" />}
+            </button>
+          ))}
+        </Popover.Content>
+      </Popover.Portal>
     </Popover.Root>
   );
 }
 
 // ---------------------------------------------------------------- sheet
 
-/** A bottom sheet that springs up, and closes when dragged down or flicked. */
+/**
+ * A bottom sheet that springs up, and closes when dragged down or flicked.
+ * Opening and closing are CSS animations on Radix's open/closed state
+ * (index.css, .sheet); dragging moves an inner layer, which is reset every
+ * time the sheet opens so it always comes up fully.
+ */
 export function Sheet({
   open,
   onOpenChange,
@@ -485,54 +482,66 @@ export function Sheet({
   footer?: ReactNode;
   description?: string;
 }) {
-  const dragY = useMotionValue(0);
-  const onHandle = dragHandle(dragY, { axis: "y", distance: () => 120, speed: 0.7, spring: sheetSpring as ValueAnimationTransition, onCommit: () => onOpenChange(false) });
+  const inner = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (open && inner.current) {
+      inner.current.getAnimations().forEach((a) => a.cancel());
+      inner.current.style.transform = "";
+    }
+  }, [open]);
+
+  const onHandle = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const node = inner.current;
+    if (!node || (e.pointerType === "mouse" && e.button !== 0)) return;
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const start = e.clientY;
+    let y = 0;
+    let last = e.clientY;
+    let lastT = performance.now();
+    let velocity = 0;
+    const move = (ev: PointerEvent) => {
+      const now = performance.now();
+      velocity = (ev.clientY - last) / Math.max(1, now - lastT);
+      last = ev.clientY;
+      lastT = now;
+      const d = ev.clientY - start;
+      y = d >= 0 ? d : d * 0.08; // a little give upwards
+      node.style.transform = `translate3d(0,${y}px,0)`;
+    };
+    const end = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+      if (y > 120 || velocity > 0.7) onOpenChange(false);
+      else slide(node, "y", y, 0, "sheet");
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  };
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <AnimatePresence>
-        {open && (
-          <DialogPrimitive.Portal forceMount>
-            <DialogPrimitive.Overlay asChild forceMount>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.25 }}
-                className="fixed inset-0 z-[60]"
-                style={{ background: "var(--scrim)" }}
-              />
-            </DialogPrimitive.Overlay>
-            <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
-              {/* The outer layer slides in and out; the inner one follows your finger. Keeping
-                  them apart stops a drag from fighting the exit animation. */}
-              <motion.div
-                initial={{ y: "110%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "110%", transition: { type: "spring", stiffness: 420, damping: 42, restDelta: 1, restSpeed: 20 } }}
-                transition={sheetSpring}
-                className="fixed inset-x-2 bottom-2 z-[61] mx-auto max-w-[560px] outline-none"
-              >
-                <motion.div
-                  style={{ y: dragY }}
-                  className="flex max-h-[calc(100dvh-60px)] flex-col overflow-hidden rounded-[38px] bg-bg shadow-[0_-8px_40px_rgba(0,0,0,0.25)]"
-                >
-                  <div className="shrink-0 cursor-grab touch-none pt-1.5 active:cursor-grabbing" onPointerDown={onHandle}>
-                    <div className="mx-auto h-[5px] w-9 rounded-full bg-label-3" />
-                    <div className="flex h-12 items-center justify-between gap-3 px-3.5">
-                      <div className="flex min-w-[44px]">{left}</div>
-                      <DialogPrimitive.Title className="truncate text-body font-semibold">{title}</DialogPrimitive.Title>
-                      <div className="flex min-w-[44px] justify-end">{right}</div>
-                    </div>
-                  </div>
-                  {description && <DialogPrimitive.Description className="sr-only">{description}</DialogPrimitive.Description>}
-                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4">{children}</div>
-                  {footer && <div className="shrink-0 px-4 pt-2 pb-[max(16px,env(safe-area-inset-bottom))]">{footer}</div>}
-                </motion.div>
-              </motion.div>
-            </DialogPrimitive.Content>
-          </DialogPrimitive.Portal>
-        )}
-      </AnimatePresence>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="scrim fixed inset-0 z-[60]" style={{ background: "var(--scrim)" }} />
+        <DialogPrimitive.Content aria-describedby={undefined} className="sheet fixed inset-x-2 bottom-2 z-[61] mx-auto max-w-[560px] outline-none">
+          <div ref={inner} className="flex max-h-[calc(100dvh-60px)] flex-col overflow-hidden rounded-[38px] bg-bg shadow-[0_-8px_40px_rgba(0,0,0,0.25)]">
+            <div className="shrink-0 cursor-grab touch-none pt-1.5 active:cursor-grabbing" onPointerDown={onHandle}>
+              <div className="mx-auto h-[5px] w-9 rounded-full bg-label-3" />
+              <div className="flex h-12 items-center justify-between gap-3 px-3.5">
+                <div className="flex min-w-[44px]">{left}</div>
+                <DialogPrimitive.Title className="truncate text-body font-semibold">{title}</DialogPrimitive.Title>
+                <div className="flex min-w-[44px] justify-end">{right}</div>
+              </div>
+            </div>
+            {description && <DialogPrimitive.Description className="sr-only">{description}</DialogPrimitive.Description>}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4">{children}</div>
+            {footer && <div className="shrink-0 px-4 pt-2 pb-[max(16px,env(safe-area-inset-bottom))]">{footer}</div>}
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );
 }

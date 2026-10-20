@@ -21,6 +21,7 @@
   --color-fill: var(--fill);
   --color-track: var(--track);
   --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
   --color-tint: var(--tint);
   --color-ink: var(--ink);
   --color-soft: var(--soft);
@@ -79,7 +80,17 @@
   --neutral-soft: rgba(108, 108, 112, 0.09);
   --seg-on: #ffffff;
   --scrim: rgba(0, 0, 0, 0.32);
+  --on-accent: #ffffff;
+  /* Springs as easing curves (same as lib/transition.ts), for CSS animations. */
+  --ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
   color-scheme: light;
+}
+@supports (animation-timing-function: linear(0, 1)) {
+  :root {
+    --ease-pop: linear(0, 0.037, 0.1139, 0.2042, 0.3189, 0.4379, 0.5539, 0.6502, 0.7475, 0.8315, 0.9012, 0.9515, 0.9957, 1.028, 1.0499, 1.0632, 1.0692, 1.0706, 1.068, 1.0624, 1.056, 1.0479, 1.0395, 1.0313, 1.0237, 1.0177, 1.0118, 1.0068, 1.0029, 1.0002, 0.998, 0.9964, 0.9955, 0.9951, 0.995, 0.9952, 0.9956, 0.9961, 0.9966, 0.9972, 0.9978, 0.9983, 0.9988, 0.9992, 0.9995, 0.9998, 1, 1.0001, 1);
+    --ease-sheet: linear(0, 0.0247, 0.0708, 0.1396, 0.2193, 0.3037, 0.3802, 0.4626, 0.5403, 0.6049, 0.6702, 0.7283, 0.7791, 0.819, 0.8571, 0.8892, 0.9134, 0.9358, 0.9539, 0.9671, 0.9788, 0.9878, 0.9946, 0.9992, 1.0029, 1.0054, 1.0069, 1.0078, 1.0082, 1.0082, 1.0079, 1.0074, 1.0068, 1.0062, 1.0055, 1.0048, 1.0041, 1.0036, 1.003, 1.0025, 1.0021, 1.0017, 1.0013, 1.0011, 1.0008, 1.0006, 1.0005, 1.0003, 1);
+  }
 }
 
 [data-theme="dark"] {
@@ -151,6 +162,7 @@
 
 @layer base {
   html {
+    scrollbar-width: none;
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
     background: var(--bg);
@@ -176,6 +188,13 @@
   [role="switch"],
   [role="radio"] {
     cursor: pointer;
+  }
+  /* No scrollbars anywhere: the app scrolls like a phone app. */
+  * {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
   }
   input[type="search"]::-webkit-search-cancel-button {
     display: none;
@@ -275,5 +294,94 @@
   .skeleton,
   .spin {
     animation: none !important;
+  }
+}
+
+/* Switching tabs: a quick fade-in. */
+@keyframes tab-enter {
+  from {
+    opacity: 0;
+  }
+}
+.tab-enter {
+  animation: tab-enter 0.2s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab-enter {
+    animation: none;
+  }
+}
+
+/* Sheets and menus animate on Radix's open/closed state; Radix holds the
+   element until the closing animation ends, and starts a menu's animation
+   only once it's in position. */
+@keyframes sheet-in {
+  from {
+    transform: translate3d(0, 110%, 0);
+  }
+}
+@keyframes sheet-out {
+  to {
+    transform: translate3d(0, 110%, 0);
+  }
+}
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes scrim-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes menu-scale {
+  from {
+    transform: scale(0.55);
+  }
+}
+@keyframes menu-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes menu-out {
+  to {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+}
+.sheet {
+  will-change: transform;
+}
+.sheet[data-state="open"] {
+  animation: sheet-in 470ms var(--ease-sheet);
+}
+.sheet[data-state="closed"] {
+  animation: sheet-out 280ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+.scrim[data-state="open"] {
+  animation: scrim-in 260ms ease-out;
+}
+.scrim[data-state="closed"] {
+  animation: scrim-out 260ms ease-in forwards;
+}
+.menu {
+  transform-origin: var(--radix-popover-content-transform-origin);
+  will-change: transform, opacity;
+}
+.menu[data-state="open"] {
+  animation:
+    menu-scale 420ms var(--ease-pop),
+    menu-fade 160ms ease-out;
+}
+.menu[data-state="closed"] {
+  animation: menu-out 150ms ease-in forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .scrim,
+  .menu {
+    animation-duration: 1ms !important;
   }
 }

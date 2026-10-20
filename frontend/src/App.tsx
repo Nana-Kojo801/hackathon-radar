@@ -1,5 +1,5 @@
-import { AnimatePresence, MotionConfig, type MotionValue, motion, useMotionValue, useTransform, type ValueAnimationTransition } from "framer-motion";
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { MotionConfig } from "framer-motion";
+import { type PointerEvent, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { ToastView } from "./components/kit";
 import { TabBar } from "./components/TabBar";
@@ -7,12 +7,12 @@ import { fetchData, fetchJSON, type Hackathon, type Meta } from "./lib/api";
 import { appearance, useAppearance } from "./lib/appearance";
 import { DEFAULT_FILTERS, type Filters, lastVisit, loadFilters, saveFilters } from "./lib/filters";
 import { daysLeft } from "./lib/format";
-import { dragHandle } from "./lib/gesture";
 import { healthWarning } from "./lib/health";
-import { pageSpring } from "./lib/motion";
 import { sync, usePersonal } from "./lib/personal";
 import { setBadge } from "./lib/push";
-import { goBack, parse, TAB_PATH, type Tab, usePath } from "./lib/router";
+import { goBack, type Overlay, parse, TAB_PATH, type Tab, usePath } from "./lib/router";
+import { currentOffset, fade, slide } from "./lib/transition";
+import { cn } from "./lib/utils";
 import { type AppData, DataContext } from "./lib/store";
 import { AppearancePage } from "./pages/Appearance";
 import { Detail } from "./pages/Detail";
@@ -163,11 +163,21 @@ export default function App() {
     if (t === shownTab.current) window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  // ------------------------------------------------------------ overlay motion
-  const width = typeof window !== "undefined" ? window.innerWidth : 390;
-  const overlayX = useMotionValue(width);
-  const underX = useTransform(overlayX, [0, width], [-width * 0.22, 0]);
-  const dim = useTransform(overlayX, [0, width], [1, 0]);
+  // ------------------------------------------------------------ overlays
+  // Pages that slide in are kept in a small stack, so the one leaving can
+  // finish its slide while the route has already moved on.
+  const under = useRef<HTMLDivElement>(null);
+  const dim = useRef<HTMLDivElement>(null);
+  const [layers, setLayers] = useState<{ key: string; overlay: Overlay; leaving: boolean }[]>(() =>
+    route.overlay && route.key ? [{ key: route.key, overlay: route.overlay, leaving: false }] : [],
+  );
+  useEffect(() => {
+    setLayers((prev) => {
+      const rest = prev.filter((l) => l.key !== route.key).map((l) => ({ ...l, leaving: true }));
+      return route.overlay && route.key ? [...rest, { key: route.key, overlay: route.overlay, leaving: false }] : rest;
+    });
+  }, [route.key, route.overlay]);
+  const gone = useCallback((key: string) => setLayers((prev) => prev.filter((l) => l.key !== key)), []);
 
   let page: ReactNode;
   if (route.tab === "today") page = <Today />;
@@ -175,31 +185,28 @@ export default function App() {
   else if (route.tab === "saved") page = <Saved />;
   else page = <SettingsTab />;
 
-  let overlay: ReactNode = null;
-  if (route.overlay?.kind === "detail") {
-    const id = route.overlay.id;
-    overlay = <Detail id={id} initial={live.get(id) ?? personal.items[id]?.hackathon} />;
-  } else if (route.overlay?.kind === "appearance") overlay = <AppearancePage />;
-  else if (route.overlay?.kind === "notifications") overlay = <NotificationsPage />;
-  else if (route.overlay?.kind === "email") overlay = <EmailAlertsPage />;
+  const render = (o: Overlay): ReactNode => {
+    if (o.kind === "detail") return <Detail id={o.id} initial={live.get(o.id) ?? personal.items[o.id]?.hackathon} />;
+    if (o.kind === "appearance") return <AppearancePage />;
+    if (o.kind === "notifications") return <NotificationsPage />;
+    return <EmailAlertsPage />;
+  };
 
   return (
     <DataContext.Provider value={data}>
       <MotionConfig reducedMotion="user">
-        <motion.div style={{ x: underX }} className="min-h-dvh will-change-transform">
-          <motion.main key={route.tab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, ease: "easeOut" }} className="mx-auto max-w-[720px]">
+        <div ref={under} className="min-h-dvh">
+          <main key={route.tab} className="tab-enter mx-auto max-w-[720px]">
             {page}
-          </motion.main>
-        </motion.div>
-        <motion.div aria-hidden="true" style={{ opacity: dim, background: "var(--scrim)" }} className="pointer-events-none fixed inset-0 z-40" />
+          </main>
+        </div>
+        <div ref={dim} aria-hidden="true" style={{ opacity: 0, background: "var(--scrim)" }} className="pointer-events-none fixed inset-0 z-40" />
         <TabBar active={route.tab} hidden={!!route.overlay} badge={closingSaved} onReselect={onReselect} />
-        <AnimatePresence>
-          {overlay && (
-            <OverlayLayer key={route.key} x={overlayX} width={width}>
-              {overlay}
-            </OverlayLayer>
-          )}
-        </AnimatePresence>
+        {layers.map((l) => (
+          <OverlayLayer key={l.key} id={l.key} leaving={l.leaving} under={under} dim={dim} onGone={gone}>
+            {render(l.overlay)}
+          </OverlayLayer>
+        ))}
         <ToastView />
       </MotionConfig>
     </DataContext.Provider>
@@ -207,33 +214,107 @@ export default function App() {
 }
 
 /**
- * A page sliding in from the right, iOS style. Drag from the left edge to go
- * back: past a third of the screen (or a quick flick) it leaves, otherwise it
- * springs back.
+ * A page sliding in from the right, iOS style, while the page underneath
+ * drifts left and dims. The slides run on the compositor with a spring curve
+ * (lib/transition.ts). Drag from the left edge to go back: past a third of
+ * the screen (or a quick flick) it leaves, otherwise it springs back.
  */
-function OverlayLayer({ x, width, children }: { x: MotionValue<number>; width: number; children: ReactNode }) {
-  useEffect(() => {
+function OverlayLayer({
+  id,
+  leaving,
+  under,
+  dim,
+  onGone,
+  children,
+}: {
+  id: string;
+  leaving: boolean;
+  under: RefObject<HTMLDivElement | null>;
+  dim: RefObject<HTMLDivElement | null>;
+  onGone: (key: string) => void;
+  children: ReactNode;
+}) {
+  const el = useRef<HTMLDivElement>(null);
+  const width = () => window.innerWidth;
+  const PARALLAX = 0.22;
+
+  /** Place the page underneath and the dim layer to match the overlay at `x`. */
+  const follow = (x: number, from: number | null, done?: () => void) => {
+    const w = width();
+    const u = under.current;
+    const d = dim.current;
+    const at = (v: number) => -w * PARALLAX * (1 - v / w);
+    if (u) {
+      u.style.willChange = "transform";
+      if (from === null) u.style.transform = `translate3d(${at(x)}px,0,0)`;
+      else slide(u, "x", at(from), at(x), "page", () => x >= w && (u.style.transform = "", u.style.willChange = ""));
+    }
+    if (d) {
+      if (from === null) d.style.opacity = String(1 - x / w);
+      else fade(d, 1 - from / w, 1 - x / w, "page");
+    }
+    if (from !== null && el.current) slide(el.current, "x", from, x, "page", done);
+  };
+
+  useLayoutEffect(() => {
     const root = document.documentElement;
-    const prev = root.style.overflow;
     root.style.overflow = "hidden";
+    follow(0, width());
     return () => {
-      root.style.overflow = prev;
+      // Another page may still be open (one slid in while this one left).
+      if (!document.querySelector("[data-overlay]:not([data-leaving])")) root.style.overflow = "";
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onEdge = dragHandle(x, { axis: "x", distance: () => width * 0.33, spring: pageSpring as ValueAnimationTransition, onCommit: () => goBack() });
+  useLayoutEffect(() => {
+    if (!leaving || !el.current) return;
+    follow(width(), currentOffset(el.current), () => onGone(id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaving]);
+
+  const onEdge = (e: PointerEvent<HTMLDivElement>) => {
+    const node = el.current;
+    if (!node || leaving) return;
+    const strip = e.currentTarget;
+    strip.setPointerCapture(e.pointerId);
+    node.getAnimations().forEach((a) => a.cancel());
+    const start = e.clientX - currentOffset(node);
+    let last = e.clientX;
+    let lastT = performance.now();
+    let velocity = 0;
+    let x = currentOffset(node);
+    const move = (ev: globalThis.PointerEvent) => {
+      const now = performance.now();
+      velocity = (ev.clientX - last) / Math.max(1, now - lastT);
+      last = ev.clientX;
+      lastT = now;
+      x = Math.max(0, ev.clientX - start);
+      node.style.transform = `translate3d(${x}px,0,0)`;
+      follow(x, null);
+    };
+    const end = () => {
+      strip.removeEventListener("pointermove", move);
+      strip.removeEventListener("pointerup", end);
+      strip.removeEventListener("pointercancel", end);
+      if (x > width() * 0.33 || velocity > 0.6) goBack();
+      else follow(0, x);
+    };
+    strip.addEventListener("pointermove", move);
+    strip.addEventListener("pointerup", end);
+    strip.addEventListener("pointercancel", end);
+  };
 
   return (
-    <motion.div
-      style={{ x }}
-      initial={{ x: width }}
-      animate={{ x: 0 }}
-      exit={{ x: width }}
-      transition={pageSpring}
-      className="fixed inset-0 z-50 overflow-hidden bg-bg shadow-[-12px_0_40px_rgba(0,0,0,0.18)]"
+    <div
+      ref={el}
+      data-overlay=""
+      data-leaving={leaving ? "" : undefined}
+      style={{ transform: `translate3d(${width()}px,0,0)`, willChange: "transform" }}
+      className={cn("fixed inset-0 z-50 overflow-hidden bg-bg shadow-[-12px_0_40px_rgba(0,0,0,0.18)]", leaving && "pointer-events-none")}
     >
       {children}
       <div aria-hidden="true" className="absolute inset-y-0 left-0 z-40 w-5 touch-none" onPointerDown={onEdge} />
-    </motion.div>
+    </div>
   );
 }

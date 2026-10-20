@@ -50,6 +50,7 @@ DECISIONS.md      choices that differ from (or fill gaps in) the spec
 | `APP_URL` | optional GitHub variable | where links in emails point; default the workers.dev URL |
 | `MAX_ENRICH_PER_RUN` | optional | default 60 AI calls per run |
 | `MAX_DISCOVERY_PAGES` | optional | default 12 web pages sent to the AI per run |
+| `MAX_POLISH_PER_RUN` | optional | default 40 descriptions tidied by the AI per run |
 | `ALLOWED_ORIGINS` | Render | comma-separated, e.g. `https://hackathon-radar.pages.dev,http://localhost:5173` |
 | `VITE_API_URL` | Cloudflare Pages (build env) | your Render URL, e.g. `https://hackathon-radar-api.onrender.com` |
 
@@ -109,7 +110,7 @@ TEST_DATABASE_URL=postgresql://postgres:pg@localhost:5432/radar_test python -m p
    - Build-time variable `VITE_API_URL=https://<your-render-service>.onrender.com`, plus `NODE_VERSION=22` if the build picks an old Node. On a Worker this goes under **Settings → Build → Variables and secrets**, not the runtime variables, because Vite bakes it in at build time.
 
    Then add the resulting site URL (`https://<project>.pages.dev` or `https://<project>.<you>.workers.dev`) to `ALLOWED_ORIGINS` on Render.
-4. **GitHub Actions (cron):** go to repo Settings → Secrets and variables → Actions and add the secrets `DATABASE_URL`, `OPENAI_API_KEY` and `SEARCH_API_KEY`. You can optionally add the variables `OPENAI_MODEL`, `MAX_ENRICH_PER_RUN` and `MAX_DISCOVERY_PAGES`. The workflow runs every 6 hours.
+4. **GitHub Actions (cron):** go to repo Settings → Secrets and variables → Actions and add the secrets `DATABASE_URL`, `OPENAI_API_KEY` and `SEARCH_API_KEY`. You can optionally add the variables `OPENAI_MODEL`, `MAX_ENRICH_PER_RUN`, `MAX_DISCOVERY_PAGES` and `MAX_POLISH_PER_RUN`. The workflow runs every 6 hours.
 5. **Personal key:** on Render, add `PERSONAL_KEY` to the API's environment: any long random string (a password manager can make one). Then open the app's **Settings** on each device and paste it once.
 6. **Push notifications (optional):** run `python -m app.push --generate-key` once and add the printed `VAPID_PRIVATE_KEY` both on Render (Environment) and as a GitHub secret. Then turn notifications on in the app (see [Push notifications](#push-notifications)).
 7. **Emails (optional):** create a free [Resend](https://resend.com) account, make an API key, and add the GitHub secrets `RESEND_API_KEY` and `NOTIFY_EMAIL` (the address you signed up to Resend with, when using the default sender). Check it with Actions → *Send test email* → *Run workflow*.

@@ -107,7 +107,7 @@ export function HackRow({
             whileTap={{ scale: 0.92 }}
             onClick={save}
             tabIndex={openId === h.id ? 0 : -1}
-            className="flex w-[66px] flex-col items-center justify-center gap-1 rounded-[16px] bg-accent text-caption font-semibold text-white"
+            className="flex w-[66px] flex-col items-center justify-center gap-1 rounded-[16px] bg-accent text-caption font-semibold text-on-accent"
           >
             <Icon name="bookmark" size={20} filled={!saved} />
             {saved ? "Unsave" : "Save"}

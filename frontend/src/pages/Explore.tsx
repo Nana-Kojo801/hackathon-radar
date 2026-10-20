@@ -129,7 +129,7 @@ export function Explore() {
                   animate={{ scale: 1 }}
                   exit={{ scale: 0 }}
                   transition={bouncy}
-                  className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] font-bold text-white"
+                  className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] font-bold text-on-accent"
                 >
                   {active.length}
                 </motion.span>
@@ -286,7 +286,7 @@ function ChipCloud({ options, isOn, onToggle }: { options: { value: string; labe
             onClick={() => onToggle(o.value)}
             whileTap={press}
             transition={bouncy}
-            className={cn("flex h-[34px] items-center gap-1.5 rounded-full px-3.5 text-[14.5px] font-semibold transition-colors", on ? "bg-accent text-white" : "card text-label")}
+            className={cn("flex h-[34px] items-center gap-1.5 rounded-full px-3.5 text-[14.5px] font-semibold transition-colors", on ? "bg-accent text-on-accent" : "card text-label")}
           >
             <AnimatePresence initial={false}>
               {on && (
@@ -296,7 +296,7 @@ function ChipCloud({ options, isOn, onToggle }: { options: { value: string; labe
               )}
             </AnimatePresence>
             {o.label}
-            {o.count !== undefined && <span className={cn("text-caption", on ? "text-white/75" : "text-label-2")}>{o.count}</span>}
+            {o.count !== undefined && <span className={cn("text-caption", on ? "text-on-accent/75" : "text-label-2")}>{o.count}</span>}
           </motion.button>
         );
       })}

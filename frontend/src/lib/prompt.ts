@@ -18,7 +18,7 @@ const DESCRIPTION_LIMIT = 6000;
 function prizeLine(p: Prize): string {
   const amount = p.amount_usd ? money(p.amount_usd) : p.amount_text;
   const winners = p.winners > 1 ? ` (${p.winners} winners)` : "";
-  const perks = p.perks.length ? ` + ${p.perks.map(cleanText).join("; ")}` : "";
+  const perks = p.perks?.length ? ` + ${p.perks.map(cleanText).join("; ")}` : "";
   return `- ${p.name}${amount ? `: ${amount}` : ""}${winners}${perks}`;
 }
 

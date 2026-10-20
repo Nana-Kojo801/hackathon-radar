@@ -48,10 +48,17 @@ export interface Prize {
   amount_usd: number | null;
   winners: number;
   perks: string[];
+  /** Only on prizes the AI read from the description. */
+  track?: string | null;
+  rank?: number | null;
 }
 
 export interface HackathonDetail extends Hackathon {
   description: string | null;
+  /** The description tidied by AI, as Markdown (pipeline/polish.py); null until it's been done. */
+  about?: string | null;
+  /** Prizes the AI found in the description, used when the platform gave no breakdown. */
+  about_prizes?: Prize[];
   prizes: Prize[];
   dates_text: string | null;
 }

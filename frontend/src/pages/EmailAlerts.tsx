@@ -77,7 +77,7 @@ function Cloud({ label, hint, options, value, onToggle }: { label: string; hint:
               whileTap={press}
               transition={bouncy}
               onClick={() => onToggle(o.value)}
-              className={cn("flex h-[34px] items-center gap-1.5 rounded-full px-3.5 text-[14.5px] font-semibold transition-colors", on ? "bg-accent text-white" : "card text-label")}
+              className={cn("flex h-[34px] items-center gap-1.5 rounded-full px-3.5 text-[14.5px] font-semibold transition-colors", on ? "bg-accent text-on-accent" : "card text-label")}
             >
               {on && <Icon name="check" size={14} stroke={3} />}
               {o.label}

@@ -1,21 +1,20 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { Icon, type IconName } from "../components/Icon";
 import { GlassButton, Menu, Thumb } from "../components/kit";
 import { OverlayPage } from "../components/OverlayPage";
+import { fromPlatform, Prizes } from "../components/Prizes";
 import { fetchData, type Hackathon, type HackathonDetail } from "../lib/api";
 import { calendarEvents, downloadIcs, googleCalendarUrl } from "../lib/calendar";
 import {
   categoryLabel,
-  cleanText,
   daysLeft,
   durationDays,
   dayMonth,
   FORMAT_LABEL,
   hostOf,
   imageOf,
-  money,
   prizeShort,
   sourceName,
   timeAgo,
@@ -24,6 +23,7 @@ import {
 } from "../lib/format";
 import { bouncy, press, spring } from "../lib/motion";
 import { claudeUrl, ideasPrompt } from "../lib/prompt";
+import { parseBlocks, RichText } from "../lib/richtext";
 import { type Stage, track, usePersonal } from "../lib/personal";
 import { copyText, toast } from "../lib/toast";
 import { cn } from "../lib/utils";
@@ -136,7 +136,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
             rel="noopener noreferrer"
             whileTap={press}
             transition={bouncy}
-            className="flex h-[54px] flex-1 flex-col items-center justify-center rounded-full bg-accent text-white"
+            className="flex h-[54px] flex-1 flex-col items-center justify-center rounded-full bg-accent text-on-accent"
           >
             <span className="flex items-center gap-1.5 text-body font-semibold">
               {register}
@@ -168,7 +168,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
 
         <About h={h} detail={detail} />
 
-        {detail && detail.prizes.length > 0 && <Prizes prizes={detail.prizes} />}
+        {detail && prizeItems(detail).length > 0 && <Prizes h={h} items={prizeItems(detail)} />}
 
         <section className="card mx-4 mt-6 overflow-hidden rounded-[22px] [&>*:last-child_.row-line]:border-b-0">
           <ActionRow icon="share" label="Share hackathon page" onClick={share} />
@@ -223,7 +223,7 @@ function Facts({ h, detail }: { h: Hackathon; detail: HackathonDetail | null }) 
   const days = daysLeft(h);
   const formatIcon: IconName = h.format === "in_person" ? "pin" : h.format === "hybrid" ? "shuffle" : "monitor";
   const where = h.format === "online" ? "Online" : h.location_text?.split(",")[0]?.trim() || FORMAT_LABEL[h.format];
-  const perks = detail?.prizes.some((p) => p.perks.length) || h.prize_notes;
+  const perks = detail?.prizes.some((p) => p.perks?.length) || h.prize_notes;
   const cells: { label: string; value: ReactNode; sub: string; tone?: string }[] = [
     { label: "Prize pool", value: prizeShort(h), sub: perks ? "+ perks" : h.prize_usd ? "in prizes" : "not announced" },
     days === null
@@ -257,14 +257,37 @@ function Facts({ h, detail }: { h: Hackathon; detail: HackathonDetail | null }) 
   );
 }
 
-const STEPS: { value: Stage; label: string }[] = [
-  { value: "saved", label: "Interested" },
-  { value: "registered", label: "Registered" },
-  { value: "submitted", label: "Submitted" },
-  { value: "won", label: "Result" },
+const STEPS: { value: Stage; label: string; icon: IconName }[] = [
+  { value: "saved", label: "Interested", icon: "bookmark" },
+  { value: "registered", label: "Registered", icon: "ticket" },
+  { value: "submitted", label: "Submitted", icon: "send" },
+  { value: "won", label: "Result", icon: "trophy" },
 ];
 const ORDER: Record<string, number> = { saved: 0, registered: 1, submitted: 2, won: 3, not_placed: 3 };
 
+function progressLine(h: Hackathon, stage: Stage | null): string {
+  const closes = h.registration_deadline && (daysLeft(h) ?? -1) >= 0 ? weekdayDate(h.registration_deadline) : null;
+  const due = h.end_date ? weekdayDate(h.end_date) : closes;
+  switch (stage) {
+    case "saved":
+      return closes ? `On your list. Registration closes ${closes}.` : "On your list.";
+    case "registered":
+      return due ? `You're registered. The event runs until ${due}.` : "You're registered.";
+    case "submitted":
+      return "Project submitted. Fingers crossed.";
+    case "won":
+      return "You won. Congratulations!";
+    case "not_placed":
+      return "Didn't place this time. On to the next one.";
+    default:
+      return "Tap a stage to track this hackathon.";
+  }
+}
+
+/**
+ * Where you are with this hackathon: four big stage tiles. The current one is
+ * filled with the accent, earlier ones are ticked off, later ones wait.
+ */
 function TrackCard({ h }: { h: Hackathon }) {
   const personal = usePersonal();
   const t = personal.items[h.id];
@@ -286,64 +309,73 @@ function TrackCard({ h }: { h: Hackathon }) {
   }, [note, editing]);
 
   const at = stage && stage !== "hidden" ? ORDER[stage] : -1;
-  const resultLabel = stage === "won" ? "Won" : stage === "not_placed" ? "Didn't place" : "Result";
+  const set = (s: Stage | null) => {
+    track(h, { status: s });
+    if (s === "won") toast("Congratulations!", "check");
+    else if (s) toast(`Marked ${s === "saved" ? "Interested" : s === "not_placed" ? "Didn't place" : s.charAt(0).toUpperCase() + s.slice(1)}`, "check");
+  };
+
+  const tile = (s: (typeof STEPS)[number], i: number) => {
+    const current = i === at;
+    const done = i < at;
+    const label = i === 3 ? (stage === "won" ? "Won" : stage === "not_placed" ? "Didn't place" : s.label) : s.label;
+    const icon: IconName = i === 3 && stage === "not_placed" ? "flag" : s.icon;
+    return (
+      <motion.button
+        type="button"
+        role="radio"
+        aria-checked={current}
+        whileTap={{ scale: 0.92 }}
+        transition={bouncy}
+        onClick={i === 3 ? undefined : () => set(current ? null : s.value)}
+        className={cn(
+          "relative flex h-[76px] w-full flex-col items-center justify-center gap-1.5 rounded-[18px] px-1 transition-colors duration-200",
+          current ? "bg-accent text-on-accent shadow-[0_8px_20px_-8px_var(--accent)]" : done ? "bg-soft text-ink" : "bg-fill text-label",
+        )}
+      >
+        <motion.span key={`${current}`} initial={current ? { scale: 0.6 } : false} animate={{ scale: 1 }} transition={bouncy} className="flex">
+          <Icon name={icon} size={22} stroke={2} filled={current && (icon === "bookmark" || icon === "trophy")} />
+        </motion.span>
+        <span className={cn("max-w-full truncate text-[calc(12.5px*var(--ts))] leading-none", current ? "font-bold" : "font-semibold")}>{label}</span>
+        {done && (
+          <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-on-accent">
+            <Icon name="check" size={10} stroke={3.4} />
+          </span>
+        )}
+      </motion.button>
+    );
+  };
 
   return (
     <section className="card mx-4 mt-5 overflow-hidden rounded-[22px]">
-      <div className="px-4 pt-4 pb-3.5">
-        <div className="flex items-baseline justify-between">
+      <div className="px-4 pt-4 pb-4">
+        <div className="flex items-baseline justify-between gap-3">
           <h2 className="text-body font-semibold">Your progress</h2>
           {stage && stage !== "hidden" && (
-            <button type="button" onClick={() => track(h, { status: null })} className="text-footnote font-medium text-label-2">
-              Remove
+            <button type="button" onClick={() => set(null)} className="text-subhead font-medium text-tint">
+              Clear
             </button>
           )}
         </div>
-        <div role="radiogroup" aria-label="Stage" className="mt-3 grid grid-cols-4 gap-[5px]">
-          {STEPS.map((s, i) => {
-            const on = i <= at;
-            const label = i === 3 ? resultLabel : s.label;
-            const button = (
-              <motion.button
-                type="button"
-                role="radio"
-                aria-checked={i === at}
-                whileTap={press}
-                transition={bouncy}
-                onClick={i === 3 ? undefined : () => track(h, { status: s.value })}
-                className="flex w-full flex-col gap-[7px] text-left"
-              >
-                <span className="relative h-1.5 overflow-hidden rounded-full bg-track">
-                  <motion.span
-                    initial={false}
-                    animate={{ scaleX: on ? 1 : 0 }}
-                    transition={{ ...bouncy, delay: on ? i * 0.06 : 0 }}
-                    style={{ originX: 0 }}
-                    className={cn("absolute inset-0 rounded-full", stage === "not_placed" && i === 3 ? "bg-label-2" : stage === "won" && i === 3 ? "bg-green" : "bg-accent")}
-                  />
-                </span>
-                <span className={cn("text-footnote", i === at ? "font-bold text-label" : "font-medium text-label-2")}>{label}</span>
-              </motion.button>
-            );
-            return i === 3 ? (
+        <p className="mt-0.5 text-subhead text-label-2">{progressLine(h, stage === "hidden" ? null : stage)}</p>
+        <div role="radiogroup" aria-label="Stage" className="mt-3.5 grid grid-cols-4 gap-2">
+          {STEPS.map((s, i) =>
+            i === 3 ? (
               <Menu
                 key={s.value}
                 title="How did it go?"
                 value={stage === "won" || stage === "not_placed" ? stage : undefined}
                 items={[
                   { value: "won", label: "Won", icon: "trophy" },
-                  { value: "not_placed", label: "Didn't place" },
+                  { value: "not_placed", label: "Didn't place", icon: "flag" },
                 ]}
-                onSelect={(v) => {
-                  track(h, { status: v as Stage });
-                  if (v === "won") toast("Congratulations!", "check");
-                }}
-                trigger={<span>{button}</span>}
+                onSelect={(v) => set(v as Stage)}
+                trigger={<div>{tile(s, i)}</div>}
               />
             ) : (
-              <span key={s.value}>{button}</span>
-            );
-          })}
+              <div key={s.value}>{tile(s, i)}</div>
+            ),
+          )}
         </div>
       </div>
       <div className="border-t hairline">
@@ -419,30 +451,45 @@ function ClaudeCard({ detail }: { detail: HackathonDetail | null }) {
 
 function About({ h, detail }: { h: Hackathon; detail: HackathonDetail | null }) {
   const [open, setOpen] = useState(false);
-  const paragraphs = useMemo(() => (detail?.description ?? "").split(/\n\s*\n/).map(cleanText).filter(Boolean), [detail?.description]);
-  const lead = h.summary || paragraphs[0] || null;
-  const rest = paragraphs.filter((p) => p !== lead);
-  const long = rest.join(" ").length > 260 || rest.length > 2;
+  const [tall, setTall] = useState(false);
+  const body = useRef<HTMLDivElement>(null);
+  const blocks = useMemo(() => {
+    const src = detail?.about || detail?.description || "";
+    const all = parseBlocks(src);
+    // The summary is shown as the lead; skip a first paragraph that just repeats it.
+    if (h.summary && all[0]?.kind === "p" && all[0].text.slice(0, 60) === h.summary.slice(0, 60)) all.shift();
+    return all;
+  }, [detail?.about, detail?.description, h.summary]);
+
+  useLayoutEffect(() => {
+    if (body.current) setTall(body.current.scrollHeight > 300);
+  }, [blocks]);
+
   const dates = h.start_date || h.end_date;
   return (
     <section>
       <h2 className="mx-5 mt-8 mb-2 text-title2 font-bold tracking-[-0.022em]">About</h2>
       <div className="mx-5">
-        {lead ? <p className="text-body leading-[1.42] tracking-[-0.02em]">{lead}</p> : !detail ? <div className="skeleton h-5 w-4/5 rounded" /> : <p className="text-subhead text-label-2">No description yet. The hackathon's page has the details.</p>}
-        {rest.length > 0 && (
-          <motion.div initial={false} animate={{ height: open || !long ? "auto" : 88 }} transition={spring} className="relative mt-2 overflow-hidden">
-            <div className="space-y-2.5 text-subhead leading-[1.45] text-label-2">
-              {rest.map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
+        {h.summary ? <p className="text-body leading-[1.42] tracking-[-0.02em]">{h.summary}</p> : !detail ? <div className="skeleton h-5 w-4/5 rounded" /> : null}
+        {blocks.length > 0 && (
+          <motion.div initial={false} animate={{ height: open || !tall ? "auto" : 260 }} transition={spring} className="relative mt-3 overflow-hidden">
+            <div ref={body}>
+              <RichText blocks={blocks} />
             </div>
-            {long && !open && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10" style={{ background: "linear-gradient(transparent, var(--bg))" }} />}
+            {tall && !open && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16" style={{ background: "linear-gradient(transparent, var(--bg))" }} />}
           </motion.div>
         )}
-        {long && (
+        {!h.summary && !blocks.length && detail && <p className="text-subhead text-label-2">No description yet. The hackathon's page has the details.</p>}
+        {tall && (
           <button type="button" onClick={() => setOpen((o) => !o)} className="mt-1 text-subhead font-semibold text-tint">
-            {open ? "Less" : "More"}
+            {open ? "Show less" : "Read more"}
           </button>
+        )}
+        {detail?.about && (
+          <p className="mt-2 flex items-center gap-1.5 text-caption text-label-2">
+            <Icon name="sparkle" size={12} filled />
+            Tidied by AI from the organizer's description
+          </p>
         )}
         {dates && (
           <p className="mt-3 flex items-center gap-2 text-footnote text-label-2">
@@ -464,55 +511,6 @@ function About({ h, detail }: { h: Hackathon; detail: HackathonDetail | null }) 
           </div>
         )}
       </div>
-    </section>
-  );
-}
-
-function Prizes({ prizes }: { prizes: HackathonDetail["prizes"] }) {
-  const [all, setAll] = useState(false);
-  const shown = all ? prizes : prizes.slice(0, 4);
-  return (
-    <section>
-      <div className="mx-5 mt-8 mb-2.5 flex items-baseline justify-between">
-        <h2 className="text-title2 font-bold tracking-[-0.022em]">Prizes</h2>
-        {prizes.length > 4 && (
-          <button type="button" onClick={() => setAll((a) => !a)} className="text-subhead font-medium text-tint">
-            {all ? "Show fewer" : `See all ${prizes.length}`}
-          </button>
-        )}
-      </div>
-      <ul className="card mx-4 overflow-hidden rounded-[22px]">
-        <AnimatePresence initial={false}>
-          {shown.map((p, i) => {
-            const rank = /\b(1st|first|winner|grand)\b/i.test(p.name) ? 1 : /\b(2nd|second|runner)/i.test(p.name) ? 2 : /\b(3rd|third)\b/i.test(p.name) ? 3 : 0;
-            const medal = rank === 1 ? "bg-[#FFF4CC] text-[#8A6100] dark:bg-[#FFCC00]/20 dark:text-[#FFD60A]" : rank === 2 ? "bg-[#EEEEF1] text-[#5A5A60] dark:bg-white/15 dark:text-[#D1D1D6]" : rank === 3 ? "bg-[#FBE9DD] text-[#8A4A1C] dark:bg-[#D2691E]/25 dark:text-[#F0A46B]" : "bg-soft text-tint";
-            const name = p.name.replace(/\s*[-–]\s*(1st|2nd|3rd|first|second|third)\s+place\s*$/i, "");
-            return (
-              <motion.li
-                key={`${p.name}-${i}`}
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={spring}
-                className="overflow-hidden"
-              >
-                <div className="flex items-center gap-3 pl-3.5">
-                  <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-callout font-extrabold", medal)}>{rank || <Icon name="trophy" size={17} />}</span>
-                  <div className={cn("flex min-h-16 min-w-0 flex-1 items-center gap-2.5 py-2.5 pr-4", i < shown.length - 1 && "border-b hairline")}>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-callout font-semibold">{name}</div>
-                      {(p.perks.length > 0 || p.winners > 1) && (
-                        <div className="text-footnote text-label-2">{[p.winners > 1 ? `${p.winners} winners, each` : null, ...p.perks.map(cleanText)].filter(Boolean).join(" · ")}</div>
-                      )}
-                    </div>
-                    <div className="shrink-0 text-body font-bold tracking-[-0.02em] tabular">{p.amount_usd ? money(p.amount_usd) : p.amount_text ?? "Non-cash"}</div>
-                  </div>
-                </div>
-              </motion.li>
-            );
-          })}
-        </AnimatePresence>
-      </ul>
     </section>
   );
 }
@@ -567,4 +565,10 @@ function DetailSkeleton() {
       <div className="skeleton mt-5 h-28 rounded-[22px]" />
     </div>
   );
+}
+
+/** The platform's prize breakdown, or the one the AI read from the description. */
+function prizeItems(d: HackathonDetail) {
+  const list = d.prizes.length ? d.prizes : (d.about_prizes ?? []);
+  return list.map(fromPlatform);
 }

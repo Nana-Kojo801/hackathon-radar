@@ -327,7 +327,7 @@ function Tile({ h, index }: { h: Hackathon; index: number }) {
     <motion.a href={`/h/${h.id}`} onClick={linkTo(`/h/${h.id}`)} {...rise(index, 4)} whileTap={press} className="w-[150px] shrink-0">
       <span className="relative block">
         <Thumb h={h} size={150} radius={20} />
-        <span className="absolute top-2 left-2 flex h-[22px] items-center rounded-full bg-accent px-2 text-[11px] font-bold tracking-[0.04em] text-white">NEW</span>
+        <span className="absolute top-2 left-2 flex h-[22px] items-center rounded-full bg-accent px-2 text-[11px] font-bold tracking-[0.04em] text-on-accent">NEW</span>
       </span>
       <div className="mt-2 truncate text-subhead font-semibold tracking-[-0.015em]">{h.title}</div>
       <div className="truncate text-footnote text-label-2">{[prizeShort(h), h.format === "online" ? "Online" : h.location_text?.split(",")[0]].filter(Boolean).join(" · ")}</div>

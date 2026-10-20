@@ -1,4 +1,4 @@
-"""Pipeline entry point: sources -> normalize -> dedupe -> upsert -> AI enrich.
+"""Pipeline entry point: sources -> normalize -> dedupe -> upsert -> AI enrich -> AI polish.
 
     python -m pipeline.run                    # full run
     python -m pipeline.run --sources devpost  # only some sources
@@ -13,7 +13,7 @@ from concurrent.futures import TimeoutError as FutureTimeout
 
 from app import db
 
-from . import details, enrich, store
+from . import details, enrich, polish, store
 from .normalize import normalize
 from .sources import all_sources
 from .types import Source
@@ -116,13 +116,16 @@ def run_pipeline(only: list[str] | None = None, do_enrich: bool = True) -> dict:
             with conn.cursor() as cur:
                 store.refresh_statuses(cur)  # AI may have filled in dates
             conn.commit()
+            summary["polish"] = polish.run_polish(conn)
 
         total_fetched = sum(s["fetched"] for s in summary["sources"].values())
         total_new = sum(s["new"] for s in summary["sources"].values())
         errors = sum(s["errors"] for s in summary["sources"].values())
-        tokens = sum(s["tokens_used"] for s in summary["sources"].values()) + (
-            summary.get("enrich") or {}
-        ).get("tokens_used", 0)
+        tokens = (
+            sum(s["tokens_used"] for s in summary["sources"].values())
+            + (summary.get("enrich") or {}).get("tokens_used", 0)
+            + (summary.get("polish") or {}).get("tokens_used", 0)
+        )
         _finish_run(conn, pipeline_run, fetched=total_fetched, new=total_new,
                     errors=errors, tokens_used=tokens)
         log.info("pipeline done: fetched=%d new=%d source_errors=%d tokens=%d",
