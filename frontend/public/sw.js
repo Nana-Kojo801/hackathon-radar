@@ -11,11 +11,11 @@
  * It also shows push notifications sent by the server (backend/app/push.py)
  * and opens the right page when one is tapped.
  */
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
 const DATA = `data-${VERSION}`;
-const PRECACHE = ["/", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png"];
+const PRECACHE = ["/", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png", "/badge-96.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(SHELL).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
@@ -85,7 +85,10 @@ self.addEventListener("push", (event) => {
     tag: data.tag || "radar",
     renotify: true,
     icon: "/icon-192.png",
-    badge: "/icon-192.png",
+    // Android draws the small icon (status bar, notification header) from the
+    // image's alpha alone, so it needs a one-colour shape on transparent; a
+    // full-colour icon comes out as a white square.
+    badge: "/badge-96.png",
     data: { url: data.url || "/" },
   };
   const badge =

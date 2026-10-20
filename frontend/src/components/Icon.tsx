@@ -1,5 +1,7 @@
 import type { SVGProps } from "react";
 
+import { accentHex, type IconStyle, markColors, useAppearance } from "../lib/appearance";
+import { SCOPE } from "../lib/mark";
 import { ICON_PATHS } from "./icons.generated";
 
 export type IconName = keyof typeof ICON_PATHS;
@@ -28,33 +30,30 @@ export function ClaudeMark({ size = 24, color = "#D97757" }: { size?: number; co
   );
 }
 
-/** The app mark: a bold H sending out a signal. Paths on a 24px grid, shared with the canvas icon. */
-export const MARK_H = "M5.6 6.2v11.6M12.6 6.2v11.6M5.6 12h7";
-export const MARK_WAVES = ["M16.2 9.4a3.7 3.7 0 0 1 0 5.2", "M18.7 6.9a7.3 7.3 0 0 1 0 10.2"];
-
-export function RadarMark({ size = 24, color = "currentColor", wave }: { size?: number; color?: string; wave?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={MARK_H} strokeWidth="3.1" />
-      <path d={MARK_WAVES[0]} strokeWidth="2.1" stroke={wave ?? color} />
-      <path d={MARK_WAVES[1]} strokeWidth="2.1" stroke={wave ?? color} strokeOpacity="0.55" />
-    </svg>
-  );
-}
-
-export function AppIcon({ size = 58, radius }: { size?: number; radius?: number }) {
+/**
+ * The app icon, "Scope" (lib/mark.ts), as it looks on the home screen: in the
+ * icon style and accent chosen in Appearance, or the ones given.
+ */
+export function AppIcon({ size = 58, radius, style, accent }: { size?: number; radius?: number; style?: IconStyle; accent?: string }) {
+  const look = useAppearance();
+  const c = markColors(style ?? look.icon, accent ?? accentHex(look.accent));
   return (
     <span
-      className="flex shrink-0 items-center justify-center"
+      className="flex shrink-0 overflow-hidden"
       style={{
         width: size,
         height: size,
         borderRadius: radius ?? size * 0.235,
-        background: "linear-gradient(160deg, var(--accent-hi) 0%, var(--accent) 100%)",
-        boxShadow: "inset 0 0 0 0.5px rgba(255,255,255,0.2)",
+        background: `linear-gradient(135deg, ${c.bg[0]} 0%, ${c.bg[1]} 100%)`,
+        boxShadow: "0 0 0 0.5px var(--sep)",
       }}
     >
-      <RadarMark size={size * 0.7} color="#fff" />
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d={SCOPE.ring} stroke={c.ring} strokeOpacity="0.2" strokeWidth="1.5" />
+        <path d={SCOPE.brackets} stroke={c.brackets} strokeWidth="7" />
+        <path d={SCOPE.sight} stroke={c.sight} strokeWidth="3.5" />
+        <path d={SCOPE.dot} fill={c.dot} />
+      </svg>
     </span>
   );
 }

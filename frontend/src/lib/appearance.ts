@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react";
 
+import { SCOPE } from "./mark";
+
 /**
  * How the app looks on this device: theme, accent colour, Liquid Glass, text
  * size, list density, home-screen icon and the tab it opens on. Kept in
@@ -174,37 +176,50 @@ darkQuery?.addEventListener("change", () => {
 
 // ---------------------------------------------------------------- icons
 
-/** The app mark (components/Icon.tsx) on a canvas, in the chosen style. */
+export interface MarkColors {
+  /** Tile gradient, top-left to bottom-right. */
+  bg: [string, string];
+  brackets: string;
+  ring: string;
+  sight: string;
+  dot: string;
+}
+
+/** The app mark's colours in each icon style; the brackets take the accent. */
+export function markColors(style: IconStyle, accent: string): MarkColors {
+  if (style === "light") return { bg: ["#ffffff", "#ffffff"], brackets: accent, ring: accent, sight: "#1c1c1e", dot: accent };
+  const bright = mix(accent, 255, 0.3);
+  if (style === "dark") return { bg: ["#000000", "#000000"], brackets: bright, ring: bright, sight: "#ffffff", dot: bright };
+  return { bg: ["#1a1e29", "#0b0c10"], brackets: bright, ring: bright, sight: "#ffffff", dot: "#c6ff3d" };
+}
+
+/** The app mark (lib/mark.ts) on a canvas, in the chosen style. */
 export function drawIcon(size: number, style: IconStyle, accentId: AccentId = state.accent): HTMLCanvasElement {
-  const accent = accentHex(accentId);
+  const m = markColors(style, accentHex(accentId));
   const c = document.createElement("canvas");
   c.width = c.height = size;
   const g = c.getContext("2d")!;
-  if (style === "classic") {
-    const grad = g.createLinearGradient(0, 0, size, size);
-    grad.addColorStop(0, mix(accent, 255, 0.3));
-    grad.addColorStop(1, accent);
-    g.fillStyle = grad;
-  } else {
-    g.fillStyle = style === "light" ? "#ffffff" : "#000000";
-  }
+  const grad = g.createLinearGradient(0, 0, size, size);
+  grad.addColorStop(0, m.bg[0]);
+  grad.addColorStop(1, m.bg[1]);
+  g.fillStyle = grad;
   g.fillRect(0, 0, size, size);
-  const fg = style === "classic" ? "#ffffff" : style === "light" ? accent : "#ffffff";
-  const wave = style === "dark" ? mix(accent, 255, 0.35) : fg;
-  // The mark fills 70% of the icon, centred.
-  const scale = (size * 0.7) / 24;
-  g.translate(size * 0.15, size * 0.15);
-  g.scale(scale, scale);
+  g.scale(size / 100, size / 100);
   g.lineCap = "round";
   g.lineJoin = "round";
-  g.strokeStyle = fg;
-  g.lineWidth = 3.1;
-  g.stroke(new Path2D("M5.6 6.2v11.6M12.6 6.2v11.6M5.6 12h7"));
-  g.strokeStyle = wave;
-  g.lineWidth = 2.1;
-  g.stroke(new Path2D("M16.2 9.4a3.7 3.7 0 0 1 0 5.2"));
-  g.globalAlpha = 0.55;
-  g.stroke(new Path2D("M18.7 6.9a7.3 7.3 0 0 1 0 10.2"));
+  g.globalAlpha = 0.2;
+  g.strokeStyle = m.ring;
+  g.lineWidth = 1.5;
+  g.stroke(new Path2D(SCOPE.ring));
+  g.globalAlpha = 1;
+  g.strokeStyle = m.brackets;
+  g.lineWidth = 7;
+  g.stroke(new Path2D(SCOPE.brackets));
+  g.strokeStyle = m.sight;
+  g.lineWidth = 3.5;
+  g.stroke(new Path2D(SCOPE.sight));
+  g.fillStyle = m.dot;
+  g.fill(new Path2D(SCOPE.dot));
   return c;
 }
 

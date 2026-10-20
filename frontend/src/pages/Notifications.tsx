@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { type ReactNode, useMemo, useState } from "react";
 
-import { Icon, RadarMark } from "../components/Icon";
+import { AppIcon, Icon } from "../components/Icon";
 import { Group, RowMenu, RowToggle, Segmented, Toggle } from "../components/kit";
 import { OverlayPage } from "../components/OverlayPage";
 import { setAppearance, useAppearance } from "../lib/appearance";
@@ -201,9 +201,7 @@ function Banner({ title, when, body, delay }: { title: string; when: string; bod
       transition={{ ...bouncy, delay }}
       className="flex gap-2.5 rounded-[22px] bg-[rgba(245,245,247,0.78)] px-3 py-[11px] text-black backdrop-blur-2xl backdrop-saturate-200 dark:bg-[rgba(44,44,48,0.72)] dark:text-white"
     >
-      <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: "linear-gradient(160deg, var(--accent-hi) 0%, var(--accent) 100%)" }}>
-        <RadarMark size={24} color="#fff" />
-      </span>
+      <AppIcon size={38} radius={9} />
       <div className="min-w-0 flex-1">
         <div className="flex justify-between gap-2 text-[14.5px] leading-[19px]">
           <span className="truncate font-semibold">{title}</span>

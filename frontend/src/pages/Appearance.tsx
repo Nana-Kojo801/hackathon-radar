@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useMemo } from "react";
 
 import { HackRow } from "../components/HackRow";
-import { Icon, RadarMark } from "../components/Icon";
+import { AppIcon, Icon } from "../components/Icon";
 import { RowToggle, Segmented, Thumb } from "../components/kit";
 import { OverlayPage } from "../components/OverlayPage";
 import {
@@ -197,18 +197,15 @@ export function AppearancePage() {
             ] as [IconStyle, string][]
           ).map(([v, label]) => {
             const on = look.icon === v;
-            const bg = v === "classic" ? `linear-gradient(160deg, ${mix(accent, 255, 0.3)} 0%, ${accent} 100%)` : v === "light" ? "#fff" : "#000";
-            const fg = v === "light" ? accent : "#fff";
-            const wave = v === "dark" ? mix(accent, 255, 0.35) : fg;
             return (
               <motion.button key={v} type="button" role="radio" aria-checked={on} whileTap={press} transition={bouncy} onClick={() => setAppearance({ icon: v })} className="flex flex-col items-center gap-2.5">
                 <motion.span
                   animate={{ scale: on ? 1 : 0.92 }}
                   transition={bouncy}
-                  className="flex h-[62px] w-[62px] items-center justify-center rounded-[15px]"
-                  style={{ background: bg, boxShadow: on ? `0 0 0 3px var(--card), 0 0 0 5.5px var(--accent)` : "0 0 0 0.5px var(--sep)" }}
+                  className="flex rounded-[15px]"
+                  style={{ boxShadow: on ? `0 0 0 3px var(--card), 0 0 0 5.5px var(--accent)` : "none" }}
                 >
-                  <RadarMark size={40} color={fg} wave={wave} />
+                  <AppIcon size={62} radius={15} style={v} accent={accent} />
                 </motion.span>
                 <span className={cn("text-subhead", on ? "font-semibold" : "font-medium")}>{label}</span>
               </motion.button>
