@@ -51,6 +51,7 @@ DECISIONS.md      choices that differ from (or fill gaps in) the spec
 | `MAX_ENRICH_PER_RUN` | optional | default 60 AI calls per run |
 | `MAX_DISCOVERY_PAGES` | optional | default 12 web pages sent to the AI per run |
 | `MAX_POLISH_PER_RUN` | optional | default 40 descriptions tidied by the AI per run |
+| `MAX_ARTWORK_PER_RUN` | optional | default 40 listings per run looked up for a cover or organizer logo |
 | `ALLOWED_ORIGINS` | Render | comma-separated, e.g. `https://hackathon-radar.pages.dev,http://localhost:5173` |
 | `VITE_API_URL` | Cloudflare Pages (build env) | your Render URL, e.g. `https://hackathon-radar-api.onrender.com` |
 
@@ -110,7 +111,7 @@ TEST_DATABASE_URL=postgresql://postgres:pg@localhost:5432/radar_test python -m p
    - Build-time variable `VITE_API_URL=https://<your-render-service>.onrender.com`, plus `NODE_VERSION=22` if the build picks an old Node. On a Worker this goes under **Settings → Build → Variables and secrets**, not the runtime variables, because Vite bakes it in at build time.
 
    Then add the resulting site URL (`https://<project>.pages.dev` or `https://<project>.<you>.workers.dev`) to `ALLOWED_ORIGINS` on Render.
-4. **GitHub Actions (cron):** go to repo Settings → Secrets and variables → Actions and add the secrets `DATABASE_URL`, `OPENAI_API_KEY` and `SEARCH_API_KEY`. You can optionally add the variables `OPENAI_MODEL`, `MAX_ENRICH_PER_RUN`, `MAX_DISCOVERY_PAGES` and `MAX_POLISH_PER_RUN`. The workflow runs every 6 hours.
+4. **GitHub Actions (cron):** go to repo Settings → Secrets and variables → Actions and add the secrets `DATABASE_URL`, `OPENAI_API_KEY` and `SEARCH_API_KEY`. You can optionally add the variables `OPENAI_MODEL`, `MAX_ENRICH_PER_RUN`, `MAX_DISCOVERY_PAGES`, `MAX_POLISH_PER_RUN` and `MAX_ARTWORK_PER_RUN`. The workflow runs every 6 hours.
 5. **Personal key:** on Render, add `PERSONAL_KEY` to the API's environment: any long random string (a password manager can make one). Then open the app's **Settings** on each device and paste it once.
 6. **Push notifications (optional):** run `python -m app.push --generate-key` once and add the printed `VAPID_PRIVATE_KEY` both on Render (Environment) and as a GitHub secret. Then turn notifications on in the app (see [Push notifications](#push-notifications)).
 7. **Emails (optional):** create a free [Resend](https://resend.com) account, make an API key, and add the GitHub secrets `RESEND_API_KEY` and `NOTIFY_EMAIL` (the address you signed up to Resend with, when using the default sender). Check it with Actions → *Send test email* → *Run workflow*.
@@ -140,7 +141,7 @@ An iPhone-style app, built phone first: large titles, grouped cards, a floating 
 - **Saved (`/saved`):** your hackathons by stage: what closes this week (with your notes), later ones, submitted, results and hidden.
 - **Settings (`/settings`):** connect the device, notifications, email alerts, reminders, the digest, appearance and which tab the app opens on.
 
-**Appearance** (Settings › Appearance, saved per device): Automatic/Light/Dark theme, six accent colours, **Liquid Glass** (clear, light-bending glass on the tab bar, buttons and menus; off gives a calmer frosted look), five text sizes, compact or comfortable lists, and three home-screen icons (iPhone picks up a new icon when the app is removed from the Home Screen and added again).
+**Appearance** (Settings › Appearance, saved per device): Automatic/Light/Dark theme, six accent colours or any custom colour, **Liquid Glass** (clear, light-bending glass on the tab bar, buttons and menus, and a subtle glass finish on cards over a faint tinted wash; off gives a calmer frosted look), five text sizes, compact or comfortable lists, and three home-screen icons (iPhone picks up a new icon when the app is removed from the Home Screen and added again).
 
 **Motion:** everything moves on springs (`frontend/src/lib/motion.ts`) tuned to be quick with a small, firm bounce: pages push in like iOS navigation, sheets and menus spring out of their buttons, the tab bar's selection pill and toggles bounce, rows follow your finger. The device's Reduce Motion setting turns animations off.
 

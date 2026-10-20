@@ -1,17 +1,17 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { type ReactNode, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { Hackathon, Prize } from "../lib/api";
 import { cleanText, compactMoney, money, prizeFull } from "../lib/format";
-import { bouncy, rise, spring } from "../lib/motion";
+import { rise, spring } from "../lib/motion";
 import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
 
 /**
- * The prize section, laid out from what the hackathon actually offers:
- * a podium when there are 1st/2nd/3rd places, a card per track when prizes
- * are grouped by track, and tiles for special awards. Prizes come from the
- * platform, or from the AI's reading of the description when it has none.
+ * The prize section, laid out from what the hackathon actually offers: the
+ * pool, how it splits between main places, tracks and special awards (a bar
+ * whose colours match the group tabs), then each group's places. Prizes come
+ * from the platform, or from the AI's reading of the description.
  */
 
 export interface PrizeItem {
@@ -52,189 +52,177 @@ export function fromPlatform(p: Prize & { track?: string | null; rank?: number |
   return { name, track, rank, usd: p.amount_usd ?? null, text: p.amount_text ?? null, winners: p.winners || 1, perks: (p.perks ?? []).map(cleanText).filter(Boolean) };
 }
 
-const MEDAL = [
-  "",
-  "bg-[linear-gradient(145deg,#FFE58A,#F5B700)] text-[#6B4A00]",
-  "bg-[linear-gradient(145deg,#F1F1F4,#B8BAC2)] text-[#45464D]",
-  "bg-[linear-gradient(145deg,#F6C9A6,#C77D45)] text-[#5A2F10]",
-];
 const PLACE = ["", "1st", "2nd", "3rd"];
+const place = (r: number) => PLACE[r] ?? `${r}th`;
+const METAL = ["", "gold", "silver", "bronze"];
 
 function amount(p: PrizeItem): string {
   if (p.usd) return money(p.usd);
   return p.text ?? (p.perks.length ? "Prizes" : "TBA");
 }
 
-function Medal({ rank, size = 36 }: { rank: number | null; size?: number }) {
-  if (!rank || rank > 3)
-    return (
-      <span className="flex shrink-0 items-center justify-center rounded-full bg-soft text-tint" style={{ width: size, height: size }}>
-        {rank ? <span className="text-footnote font-bold">{rank}th</span> : <Icon name="trophy" size={size * 0.48} />}
-      </span>
-    );
-  return (
-    <span className={cn("flex shrink-0 items-center justify-center rounded-full font-extrabold shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_2px_6px_rgba(0,0,0,0.12)]", MEDAL[rank])} style={{ width: size, height: size, fontSize: size * 0.42 }}>
-      {rank}
-    </span>
-  );
+const value = (p: PrizeItem) => (p.usd ?? 0) * (p.winners || 1);
+
+interface Group {
+  key: string;
+  name: string;
+  list: PrizeItem[];
+  total: number;
 }
 
+/** Sorts prizes into what the hackathon actually has: main places, one group per track, special awards. */
+function groupPrizes(items: PrizeItem[]): Group[] {
+  const groups: Group[] = [];
+  const add = (key: string, name: string, list: PrizeItem[]) => list.length && groups.push({ key, name, list, total: list.reduce((n, p) => n + value(p), 0) });
+  const ranked = items.filter((p) => p.rank).sort((a, b) => a.rank! - b.rank!);
+  add("main", "Main prizes", ranked.filter((p) => !p.track));
+  const tracks = [...new Set(ranked.map((p) => p.track).filter(Boolean))] as string[];
+  for (const t of tracks) add(`t:${t}`, t, ranked.filter((p) => p.track === t));
+  add("awards", groups.length ? "Special awards" : "Awards", items.filter((p) => !p.rank));
+  return groups;
+}
+
+/** Groups get steps of the accent, strongest first (an ordered scale, so no rainbow). */
+function shade(i: number): string {
+  const steps = [100, 68, 46, 32, 22];
+  return `color-mix(in srgb, var(--accent) ${steps[Math.min(i, steps.length - 1)]}%, var(--card-2))`;
+}
+
+const SHOWN = 5;
+
 export function Prizes({ h, items }: { h: Hackathon; items: PrizeItem[] }) {
-  const { podium, tracks, awards, total, top } = useMemo(() => {
-    const ranked = items.filter((p) => p.rank);
-    const byTrack = new Map<string, PrizeItem[]>();
-    for (const p of ranked) {
-      const k = p.track ?? "";
-      byTrack.set(k, [...(byTrack.get(k) ?? []), p]);
-    }
-    const named = [...byTrack.entries()].filter(([k]) => k);
-    const loose = byTrack.get("") ?? [];
-    // One group of places, no tracks: a podium. Several tracks: a card each.
-    const podium = loose.length >= 2 ? loose.sort((a, b) => a.rank! - b.rank!) : named.length === 1 && !loose.length ? named[0][1].sort((a, b) => a.rank! - b.rank!) : [];
-    const tracks = (podium.length && named.length === 1 && !loose.length ? [] : named).map(([name, list]) => ({ name, list: list.sort((a, b) => a.rank! - b.rank!) }));
-    const awards = [...items.filter((p) => !p.rank), ...(loose.length === 1 ? loose : [])];
-    const sum = items.reduce((s, p) => s + (p.usd ?? 0) * (p.winners || 1), 0);
-    const top = items.reduce((m, p) => Math.max(m, p.usd ?? 0), 0);
-    return { podium, tracks, awards, total: sum, top };
-  }, [items]);
-  const [allAwards, setAllAwards] = useState(false);
-  const shownAwards = allAwards ? awards : awards.slice(0, 6);
-  const trackName = podium.length && podium[0].track ? podium[0].track : null;
+  const groups = useMemo(() => groupPrizes(items), [items]);
+  const [active, setActive] = useState(groups[0]?.key);
+  const [all, setAll] = useState(false);
+  const group = groups.find((g) => g.key === active) ?? groups[0];
+  const total = groups.reduce((n, g) => n + g.total, 0);
+  const winners = items.reduce((n, p) => n + (p.winners || 1), 0);
+  const tracks = groups.filter((g) => g.key.startsWith("t:")).length;
+  const perks = [...new Set(items.flatMap((p) => p.perks))];
+  const pool = h.prize_usd ? prizeFull(h) : total ? money(total) : "Prizes TBA";
+  const summary = [`${items.length} ${items.length === 1 ? "prize" : "prizes"}`, winners > items.length ? `${winners} winners` : null, tracks > 1 ? `${tracks} tracks` : null].filter(Boolean).join(" · ");
+  const rows = all ? group.list : group.list.slice(0, SHOWN);
+  const split = groups.length > 1 && total > 0;
 
   return (
     <section>
       <h2 className="mx-5 mt-8 mb-2.5 text-title2 font-bold tracking-[-0.022em]">Prizes</h2>
-
-      <motion.div {...rise(0)} className="mx-4 overflow-hidden rounded-[22px] p-4 text-white" style={{ background: "linear-gradient(140deg, var(--accent-hi) 0%, var(--accent) 70%)" }}>
-        <div className="text-footnote font-semibold tracking-[0.02em] uppercase opacity-80">Prize pool</div>
-        <div className="mt-0.5 text-[calc(32px*var(--ts))] leading-tight font-bold tracking-[-0.03em] tabular">{h.prize_usd ? prizeFull(h) : total ? money(total) : "Prizes TBA"}</div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          <Pill>{items.length} {items.length === 1 ? "prize" : "prizes"}</Pill>
-          {tracks.length > 1 && <Pill>{tracks.length} tracks</Pill>}
-          {top > 0 && <Pill>Top prize {compactMoney(top)}</Pill>}
-          {items.some((p) => p.winners > 1) && <Pill>{items.reduce((n, p) => n + p.winners, 0)} winners</Pill>}
-        </div>
-      </motion.div>
-
-      {podium.length >= 2 && (
-        <div className="card mx-4 mt-3 rounded-[22px] px-3 pt-4 pb-3">
-          {trackName && <div className="mb-2 text-center text-footnote font-semibold text-label-2">{trackName}</div>}
-          <div className="flex items-end justify-center gap-2">
-            {[podium[1], podium[0], podium[2]].map((p, i) =>
-              p ? (
-                <motion.div
-                  key={`${p.rank}-${i}`}
-                  initial={{ opacity: 0, y: 24 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ ...bouncy, delay: [0.08, 0, 0.16][i] }}
-                  className="flex min-w-0 flex-1 flex-col items-center"
-                >
-                  <Medal rank={p.rank} size={p.rank === 1 ? 44 : 38} />
-                  <div className="mt-1.5 max-w-full truncate text-callout font-bold tracking-[-0.02em] tabular">{amount(p)}</div>
-                  {p.winners > 1 && <div className="text-caption text-label-2">× {p.winners} winners</div>}
-                  <div
-                    className={cn("mt-2 flex w-full items-start justify-center rounded-t-[14px] pt-2 text-footnote font-bold", p.rank === 1 ? "h-[84px] bg-soft text-ink" : p.rank === 2 ? "h-[62px] bg-fill text-label-2" : "h-[46px] bg-fill text-label-2")}
-                  >
-                    {PLACE[p.rank ?? 0] ?? `${p.rank}th`}
-                  </div>
-                </motion.div>
-              ) : (
-                <div key={i} className="flex-1" />
-              ),
-            )}
+      <motion.div {...rise(0)} className="card mx-4 overflow-hidden rounded-[22px]">
+        <div className="flex items-start gap-3 px-4 pt-4">
+          <div className="min-w-0 flex-1">
+            <div className="text-footnote font-medium text-label-2">Prize pool</div>
+            <div className="mt-0.5 text-[calc(34px*var(--ts))] leading-[1.1] font-bold tracking-[-0.035em] tabular">{pool}</div>
+            <div className="mt-1 text-footnote text-label-2">{summary}</div>
           </div>
-          {podium.slice(3).length > 0 && (
-            <div className="mt-2 space-y-1.5">
-              {podium.slice(3).map((p, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-[12px] bg-card-2 px-3 py-2">
-                  <Medal rank={p.rank} size={28} />
-                  <span className="flex-1 text-subhead font-medium">{PLACE[p.rank ?? 0] || `${p.rank}th`} place</span>
-                  <span className="text-subhead font-bold tabular">{amount(p)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {podium.some((p) => p.perks.length) && <Perks perks={[...new Set(podium.flatMap((p) => p.perks))]} />}
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px] bg-[var(--gold-bg)] text-[var(--gold-fg)] shadow-[inset_0_0_0_1px_var(--gold-ring)]">
+            <Icon name="trophy" size={22} />
+          </span>
         </div>
-      )}
 
-      {tracks.length > 0 && (
-        <div className="no-scrollbar snap-row mt-3 flex gap-3 overflow-x-auto px-4 pb-1">
-          {tracks.map((t, i) => (
-            <motion.div key={t.name} {...rise(i, 4)} className={cn("card shrink-0 rounded-[22px] p-4", tracks.length > 1 ? "w-[280px]" : "w-full")}>
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-soft text-tint">
-                  <Icon name="sparkle" size={15} filled />
-                </span>
-                <div className="min-w-0 flex-1 truncate text-callout font-semibold">{t.name}</div>
-                <div className="text-footnote font-semibold text-label-2 tabular">{compactMoney(t.list.reduce((s, p) => s + (p.usd ?? 0) * p.winners, 0)) || ""}</div>
-              </div>
-              <div className="mt-3 space-y-2">
-                {t.list.map((p, j) => (
-                  <div key={j} className="flex items-center gap-3">
-                    <Medal rank={p.rank} size={30} />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-subhead font-medium">{PLACE[p.rank ?? 0] || `${p.rank}th`} place</div>
-                      {p.perks.length > 0 && <div className="truncate text-caption text-label-2">+ {p.perks.join(" · ")}</div>}
-                    </div>
-                    <div className="text-callout font-bold tracking-[-0.02em] tabular">{amount(p)}</div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      )}
+        {split && (
+          <motion.div
+            className="mx-4 mt-4 flex h-2 gap-[2px] overflow-hidden rounded-full"
+            initial={{ clipPath: "inset(0 100% 0 0 round 99px)" }}
+            whileInView={{ clipPath: "inset(0 0% 0 0 round 99px)" }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            aria-hidden="true"
+          >
+            {groups.map((g, i) => g.total > 0 && <div key={g.key} style={{ flexGrow: g.total, background: shade(i) }} />)}
+          </motion.div>
+        )}
 
-      {awards.length > 0 && (
-        <>
-          {(podium.length > 0 || tracks.length > 0) && <h3 className="mx-5 mt-5 mb-2 text-callout font-semibold">Special awards</h3>}
-          <div className={cn("mx-4 grid grid-cols-2 gap-2.5", !(podium.length || tracks.length) && "mt-3")}>
-            <AnimatePresence initial={false}>
-              {shownAwards.map((p, i) => (
-                <motion.div
-                  key={`${p.name}-${i}`}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ ...spring, delay: Math.min(i, 6) * 0.03 }}
-                  className="card flex flex-col rounded-[20px] p-3.5"
-                >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-soft text-tint">
-                    <Icon name="trophy" size={18} />
-                  </span>
-                  <div className="mt-2.5 line-clamp-3 text-subhead leading-snug font-semibold">{p.name}</div>
-                  <div className="mt-auto pt-2 text-body font-bold tracking-[-0.02em] tabular">{amount(p)}</div>
-                  {(p.winners > 1 || p.perks.length > 0) && (
-                    <div className="line-clamp-2 text-caption text-label-2">{[p.winners > 1 ? `${p.winners} winners, each` : null, ...p.perks].filter(Boolean).join(" · ")}</div>
+        {groups.length > 1 && (
+          <div role="tablist" aria-label="Prize groups" className="no-scrollbar mt-3 flex gap-2 overflow-x-auto px-4">
+            {groups.map((g, i) => {
+              const on = g.key === group.key;
+              return (
+                <button
+                  key={g.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={(e) => {
+                    setActive(g.key);
+                    setAll(false);
+                    e.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+                  }}
+                  className={cn(
+                    "flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-footnote font-semibold whitespace-nowrap transition-colors",
+                    on ? "bg-label text-bg" : "bg-fill text-label",
                   )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                >
+                  {split && <span className="h-2 w-2 rounded-full" style={{ background: shade(i) }} />}
+                  {g.name}
+                  {g.total > 0 && <span className={cn("font-medium tabular", on ? "opacity-70" : "text-label-2")}>{compactMoney(g.total)}</span>}
+                </button>
+              );
+            })}
           </div>
-          {awards.length > 6 && (
-            <button type="button" onClick={() => setAllAwards((a) => !a)} className="mx-5 mt-2.5 text-subhead font-semibold text-tint">
-              {allAwards ? "Show fewer" : `Show all ${awards.length} awards`}
+        )}
+
+        <div className="mt-2">
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.ul key={group.key} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -14 }} transition={spring}>
+              {rows.map((p, i) => (
+                <PrizeRow key={`${p.name}-${p.rank}-${i}`} p={p} lead={i === 0 && p.rank === 1} first={i === 0} />
+              ))}
+            </motion.ul>
+          </AnimatePresence>
+          {group.list.length > SHOWN && (
+            <button type="button" onClick={() => setAll((a) => !a)} className="flex h-11 w-full items-center gap-1 border-t hairline px-4 text-subhead font-semibold text-tint">
+              {all ? "Show fewer" : `Show all ${group.list.length}`}
+              <Icon name="chevronDown" size={14} className={cn("transition-transform", all && "rotate-180")} />
             </button>
           )}
-        </>
-      )}
+        </div>
+
+        {perks.length > 0 && (
+          <div className="flex items-start gap-2.5 border-t hairline px-4 py-3">
+            <Icon name="gift" size={18} className="mt-px shrink-0 text-tint" />
+            <p className="text-footnote leading-snug text-label-2">
+              <span className="font-semibold text-label">Also: </span>
+              {perks.slice(0, 6).join(" · ")}
+            </p>
+          </div>
+        )}
+      </motion.div>
     </section>
   );
 }
 
-function Pill({ children }: { children: ReactNode }) {
-  return <span className="rounded-full bg-white/20 px-2.5 py-1 text-caption font-semibold backdrop-blur-sm">{children}</span>;
+function Badge({ p }: { p: PrizeItem }) {
+  const metal = p.rank ? METAL[p.rank] : null;
+  if (metal)
+    return (
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-subhead font-bold tabular"
+        style={{ background: `var(--${metal}-bg)`, color: `var(--${metal}-fg)`, boxShadow: `inset 0 0 0 1px var(--${metal}-ring)` }}
+      >
+        {p.rank}
+      </span>
+    );
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-fill text-label-2">
+      {p.rank ? <span className="text-footnote font-bold tabular">{p.rank}</span> : <Icon name={p.usd ? "trophy" : "gift"} size={17} />}
+    </span>
+  );
 }
 
-function Perks({ perks }: { perks: string[] }) {
+function PrizeRow({ p, lead, first }: { p: PrizeItem; lead: boolean; first: boolean }) {
+  // "1st place" for plain places and track places; named ones ("Grand Prize", "Runner-up") keep their name.
+  const title = !p.rank ? p.name : p.track || new RegExp(`^${ORDINAL}`, "i").test(p.name) ? `${place(p.rank)} place` : p.name;
+  const sub = [p.winners > 1 ? `${p.winners} winners${p.usd ? `, ${compactMoney(p.usd)} each` : ""}` : null, ...p.perks].filter(Boolean).join(" · ");
   return (
-    <div className="mt-3 flex flex-wrap justify-center gap-1.5 border-t hairline pt-3">
-      {perks.slice(0, 6).map((p) => (
-        <span key={p} className="rounded-full bg-fill px-2.5 py-1 text-caption font-medium text-label-2">
-          + {p}
-        </span>
-      ))}
-    </div>
+    <li className="relative flex items-center gap-3 px-4 py-2.5">
+      {/* Inset separator, starting after the badge like an iOS list. */}
+      {!first && <span aria-hidden="true" className="absolute top-0 right-0 left-[64px] h-px bg-[var(--sep)]" />}
+      <Badge p={p} />
+      <div className="min-w-0 flex-1">
+        <div className={cn("leading-snug", lead ? "text-callout font-semibold" : "text-subhead font-medium")}>{title}</div>
+        {sub && <div className="line-clamp-2 text-caption text-label-2">{sub}</div>}
+      </div>
+      <div className={cn("shrink-0 text-right font-bold tracking-[-0.02em] tabular", lead ? "text-title3" : "text-callout")}>{p.winners > 1 && p.usd ? compactMoney(value(p)) : amount(p)}</div>
+    </li>
   );
 }

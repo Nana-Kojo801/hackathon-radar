@@ -200,7 +200,7 @@ export default function App() {
     if (o.kind === "notifications") return <NotificationsPage />;
     if (o.kind === "stats")
       return (
-        <Suspense fallback={<div className="absolute inset-0 bg-bg" />}>
+        <Suspense fallback={<div className="page-bg absolute inset-0" />}>
           <StatsPage />
         </Suspense>
       );
@@ -326,7 +326,7 @@ function OverlayLayer({
       data-overlay=""
       data-leaving={leaving ? "" : undefined}
       style={{ transform: `translate3d(${width()}px,0,0)`, willChange: "transform" }}
-      className={cn("fixed inset-0 z-50 overflow-hidden bg-bg shadow-[-12px_0_40px_rgba(0,0,0,0.18)]", leaving && "pointer-events-none")}
+      className={cn("page-bg fixed inset-0 z-50 overflow-hidden shadow-[-12px_0_40px_rgba(0,0,0,0.18)]", leaving && "pointer-events-none")}
     >
       {children}
       <div aria-hidden="true" className="absolute inset-y-0 left-0 z-40 w-5 touch-none" onPointerDown={onEdge} />

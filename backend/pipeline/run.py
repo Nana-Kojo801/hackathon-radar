@@ -13,7 +13,7 @@ from concurrent.futures import TimeoutError as FutureTimeout
 
 from app import db
 
-from . import details, enrich, polish, store
+from . import artwork, details, enrich, polish, store
 from .normalize import normalize
 from .sources import all_sources
 from .types import Source
@@ -118,6 +118,8 @@ def run_pipeline(only: list[str] | None = None, do_enrich: bool = True) -> dict:
             conn.commit()
             summary["polish"] = polish.run_polish(conn)
 
+        summary["artwork"] = artwork.run_artwork(conn)
+
         total_fetched = sum(s["fetched"] for s in summary["sources"].values())
         total_new = sum(s["new"] for s in summary["sources"].values())
         errors = sum(s["errors"] for s in summary["sources"].values())
@@ -125,6 +127,7 @@ def run_pipeline(only: list[str] | None = None, do_enrich: bool = True) -> dict:
             sum(s["tokens_used"] for s in summary["sources"].values())
             + (summary.get("enrich") or {}).get("tokens_used", 0)
             + (summary.get("polish") or {}).get("tokens_used", 0)
+            + (summary.get("artwork") or {}).get("tokens_used", 0)
         )
         _finish_run(conn, pipeline_run, fetched=total_fetched, new=total_new,
                     errors=errors, tokens_used=tokens)

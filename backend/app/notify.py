@@ -156,6 +156,11 @@ def _thumb(h: dict) -> str:
     if img and "thumbnail-placeholder" not in img:
         return (f'<img src="{html.escape(img)}" width="56" height="56" alt="" '
                 'style="display:block;width:56px;height:56px;border-radius:13px;object-fit:cover;border:0">')
+    if h.get("logo_url"):
+        # The organizer's logo, padded on a white tile like the app shows it.
+        return (f'<img src="{html.escape(h["logo_url"])}" width="40" height="40" alt="" '
+                'style="display:block;width:40px;height:40px;padding:8px;background:#fff;border-radius:13px;'
+                'object-fit:contain;border:1px solid #e5e5ea">')
     return ('<div style="width:56px;height:56px;border-radius:13px;background:#2F6BFF;'
             'background-image:linear-gradient(145deg,#7B61FF,#2F6BFF);color:#fff;font-size:24px;line-height:56px;text-align:center">&#10022;</div>')
 

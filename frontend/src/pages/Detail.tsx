@@ -15,6 +15,7 @@ import {
   FORMAT_LABEL,
   hostOf,
   imageOf,
+  logoOf,
   prizeShort,
   sourceName,
   timeAgo,
@@ -79,7 +80,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
   const source = sourceName(h);
   const register = `Register on ${source === "the web" ? hostOf(h.source_url) : source}`;
   const days = daysLeft(h);
-  const img = imageOf(h);
+  const img = imageOf(h) ?? logoOf(h);
 
   const share = async () => {
     const url = h.source_url;

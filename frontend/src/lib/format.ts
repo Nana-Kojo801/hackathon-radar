@@ -226,6 +226,11 @@ export function todayLong(): string {
   return longDateFmt.format(new Date()).replace(",", "");
 }
 
+/** The organizer's logo, shown on a plain tile when there's no cover. */
+export function logoOf(h: Pick<Hackathon, "image_url" | "logo_url">): string | null {
+  return imageOf(h) ? null : (h.logo_url ?? null);
+}
+
 /** The listing's own image, unless it's a platform placeholder. */
 export function imageOf(h: Pick<Hackathon, "image_url">): string | null {
   const u = h.image_url;

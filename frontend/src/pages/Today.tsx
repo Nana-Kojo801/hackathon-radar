@@ -7,7 +7,7 @@ import { WeekRecap } from "../components/StatsTeasers";
 import { meta } from "../components/HackRow";
 import type { Hackathon } from "../lib/api";
 import { DEFAULT_FILTERS, type Filters } from "../lib/filters";
-import { daysLeft, imageOf, isNew, prizeFull, prizeShort, todayLong, weekday, weekdayDate, fallbackArt, dueTag } from "../lib/format";
+import { daysLeft, imageOf, isNew, logoOf, prizeFull, prizeShort, todayLong, weekday, weekdayDate, fallbackArt, dueTag } from "../lib/format";
 import { press, rise, spring } from "../lib/motion";
 import { type Stage, usePersonal } from "../lib/personal";
 import { linkTo, navigate } from "../lib/router";
@@ -244,9 +244,10 @@ function DeadlineCard({ h, status, days, index }: { h: Hackathon; status: Stage;
   );
 }
 
-/** Wide covers fill the card; square logos sit on a blurred wash of themselves. */
+/** Wide covers fill the card; square logos (and organizer logos) sit on a blurred wash of themselves. */
 function Hero({ h }: { h: Hackathon }) {
-  const src = imageOf(h);
+  const logo = logoOf(h);
+  const src = imageOf(h) ?? logo;
   const [wide, setWide] = useState<boolean | null>(null);
   const [failed, setFailed] = useState(false);
   const art = fallbackArt(h);
@@ -267,11 +268,14 @@ function Hero({ h }: { h: Hackathon }) {
             <img
               src={src}
               alt=""
-              onLoad={(e) => setWide(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight > 1.35)}
+              onLoad={(e) => setWide(!logo && e.currentTarget.naturalWidth / e.currentTarget.naturalHeight > 1.35)}
               onError={() => setFailed(true)}
               className={cn(
                 wide === false
-                  ? "absolute top-1/2 left-1/2 h-[128px] w-[128px] -translate-x-1/2 -translate-y-1/2 rounded-[28px] object-cover shadow-[0_12px_30px_-8px_rgba(0,0,0,0.45)]"
+                  ? cn(
+                      "absolute top-1/2 left-1/2 h-[128px] w-[128px] -translate-x-1/2 -translate-y-1/2 rounded-[28px] shadow-[0_12px_30px_-8px_rgba(0,0,0,0.45)]",
+                      logo ? "bg-white object-contain p-5" : "object-cover",
+                    )
                   : "absolute inset-0 h-full w-full object-cover",
                 wide === null && "opacity-0",
               )}

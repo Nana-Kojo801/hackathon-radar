@@ -23,6 +23,8 @@ export interface Hackathon {
   organizer: string | null;
   summary: string | null;
   image_url: string | null;
+  /** The organizer's logo (or the event site's icon), for listings without a cover. */
+  logo_url?: string | null;
   prize_text: string | null;
   prize_usd: number | null;
   prize_confidence: "high" | "medium" | "low" | null;

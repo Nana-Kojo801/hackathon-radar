@@ -27,8 +27,12 @@ app.include_router(push.public_router)
 app.include_router(stats.router)
 app.include_router(stats.public_router)
 
+# A listing without its own image (or with a platform placeholder) gets the share
+# image of its own page, when the artwork step found one; logo_url is the organizer's.
 LIST_COLUMNS = """
-    id, source, source_url, alt_urls, title, organizer, summary, image_url,
+    id, source, source_url, alt_urls, title, organizer, summary,
+    CASE WHEN image_url IS NULL OR image_url ~* 'placeholder|default[-_]?thumbnail'
+         THEN COALESCE(page_image_url, image_url) ELSE image_url END AS image_url, logo_url,
     prize_text, prize_usd::float AS prize_usd, prize_confidence, prize_notes,
     format, location_text, categories, international_ok, student_only,
     start_date, end_date, registration_deadline, status, relevance_score,

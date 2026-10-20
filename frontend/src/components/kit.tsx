@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { Hackathon } from "../lib/api";
-import { dueTag, fallbackArt, imageOf } from "../lib/format";
+import { dueTag, fallbackArt, imageOf, logoOf } from "../lib/format";
 import { bouncy, press, pressSmall, spring } from "../lib/motion";
 import { slide } from "../lib/transition";
 import { type Stage, stageLabel } from "../lib/personal";
@@ -100,18 +100,40 @@ export function PrimaryButton({
 
 // ---------------------------------------------------------------- headers
 
-/** True once the page (or the given scroll container) has scrolled past `threshold`. */
+/**
+ * True once the page (or the given scroll container) has scrolled past
+ * `threshold`. It flips back a little lower than it flipped on, so a scroll
+ * resting near the threshold (or iOS momentum) can't toggle it back and forth.
+ */
 export function useScrolled(threshold = 44, ref?: RefObject<HTMLElement | null>): boolean {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const el = ref?.current;
-    const read = () => setScrolled((el ? el.scrollTop : window.scrollY) > threshold);
+    const read = () => {
+      const y = el ? el.scrollTop : window.scrollY;
+      setScrolled((was) => (was ? y > threshold - 12 : y > threshold));
+    };
     const target: HTMLElement | Window = el ?? window;
     target.addEventListener("scroll", read, { passive: true });
     read();
     return () => target.removeEventListener("scroll", read);
   }, [threshold, ref]);
   return scrolled;
+}
+
+/**
+ * The frosted backing of a bar that appears on scroll. The blur and tint
+ * transition themselves; fading the element's opacity instead makes WebKit
+ * drop the blur mid-fade and snap it back, which shows as a flicker.
+ */
+export function BarBacking({ show }: { show: boolean }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="bar-backing absolute inset-0 border-b"
+      data-show={show || undefined}
+    />
+  );
 }
 
 /** iOS large title, with an optional line above it and buttons to its right. */
@@ -138,24 +160,18 @@ export function LargeTitle({ eyebrow, title, subtitle, accessory }: { eyebrow?: 
 /** The slim bar that fades in once the large title scrolls away. */
 export function CompactBar({ title, show, left, right }: { title: string; show: boolean; left?: ReactNode; right?: ReactNode }) {
   return (
-    <motion.div
-      aria-hidden={!show}
-      initial={false}
-      animate={{ opacity: show ? 1 : 0, y: show ? 0 : -6 }}
-      transition={spring}
-      className={cn("fixed inset-x-0 top-0 z-30", !show && "pointer-events-none")}
-    >
-      <div
-        className="border-b hairline px-4 pt-[env(safe-area-inset-top)]"
-        style={{ background: "color-mix(in srgb, var(--bg) 78%, transparent)", WebkitBackdropFilter: "blur(20px) saturate(180%)", backdropFilter: "blur(20px) saturate(180%)" }}
-      >
+    <div aria-hidden={!show} className={cn("fixed inset-x-0 top-0 z-30", !show && "pointer-events-none")}>
+      <BarBacking show={show} />
+      <div className="relative px-4 pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-11 max-w-[720px] items-center justify-between gap-3">
           <div className="flex w-16 justify-start">{left}</div>
-          <div className="min-w-0 truncate text-body font-semibold">{title}</div>
+          <div className="bar-title min-w-0 truncate text-body font-semibold" data-show={show || undefined}>
+            {title}
+          </div>
           <div className="flex w-16 justify-end">{right}</div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -527,7 +543,7 @@ export function Sheet({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="scrim fixed inset-0 z-[60]" style={{ background: "var(--scrim)" }} />
         <DialogPrimitive.Content aria-describedby={undefined} className="sheet fixed inset-x-2 bottom-2 z-[61] mx-auto max-w-[560px] outline-none">
-          <div ref={inner} className="flex max-h-[calc(100dvh-60px)] flex-col overflow-hidden rounded-[38px] bg-bg shadow-[0_-8px_40px_rgba(0,0,0,0.25)]">
+          <div ref={inner} className="flex max-h-[calc(100dvh-60px)] flex-col overflow-hidden rounded-[38px] page-bg shadow-[0_-8px_40px_rgba(0,0,0,0.25)]">
             <div className="shrink-0 cursor-grab touch-none pt-1.5 active:cursor-grabbing" onPointerDown={onHandle}>
               <div className="mx-auto h-[5px] w-9 rounded-full bg-label-3" />
               <div className="flex h-12 items-center justify-between gap-3 px-3.5">
@@ -597,19 +613,29 @@ export function StageTag({ status, className }: { status: Stage; className?: str
   return <span className={cn("inline-flex h-5 shrink-0 items-center rounded-[6px] px-[7px] text-caption font-semibold whitespace-nowrap", tone, className)}>{stageLabel(status)}</span>;
 }
 
-/** The listing's own art, or a gradient tile with a glyph when it has none (or it fails to load). */
+/** The listing's own art, else the organizer's logo on a white tile, else a gradient tile with a glyph. */
 export function Thumb({ h, size, radius, className, contain }: { h: Hackathon; size: number; radius?: number; className?: string; contain?: boolean }) {
-  const src = imageOf(h);
+  const cover = imageOf(h);
+  const logo = logoOf(h);
   const [failed, setFailed] = useState(false);
   const art = fallbackArt(h);
   const r = radius ?? Math.round(size * 0.24);
+  const src = failed ? null : (cover ?? logo);
+  const isLogo = !cover && !!logo;
   return (
     <span
       className={cn("thumb-line relative flex shrink-0 items-center justify-center overflow-hidden text-white", className)}
-      style={{ width: size, height: size, borderRadius: r, background: src && !failed ? "var(--card)" : art.gradient }}
+      style={{ width: size, height: size, borderRadius: r, background: src ? (isLogo ? "#fff" : "var(--card)") : art.gradient }}
     >
-      {src && !failed ? (
-        <img src={src} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} className={cn("h-full w-full", contain ? "object-contain" : "object-cover")} />
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+          className={cn("h-full w-full", isLogo ? "object-contain p-[16%]" : contain ? "object-contain" : "object-cover")}
+        />
       ) : (
         <svg width={size * 0.46} height={size * 0.46} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d={art.glyph} />

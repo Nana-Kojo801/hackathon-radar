@@ -141,6 +141,13 @@ A small static FX table (`normalize.FX_TO_USD`) converts INR/EUR/CAD/etc. right 
 - **Saving without a key** works: changes stay pending on the device and go up when it's connected.
 - **Email layout** matches the app: cards with the listing's image, the prize and deadline, and **Open in app** / **Register** buttons.
 
+## Covers, glass cards and the scroll bar
+
+- **Covers for listings without one** (`pipeline/artwork.py`, after enrichment): first the share image of the hackathon's own page; else the organizer's logo, read from the homepage of its official site (the AI maps organizer names to domains in one batched call, cached in `organizer_sites`); else the event site's own icon. Listing sites (hackathonhub, internshala, ...) use one share image and one icon for every event, so an image shared by several listings, or a logo shared by different organizers, is dropped. Every image is checked to load before it's kept. The API folds the found cover into `image_url` (so the emails get it too) and returns `logo_url`, which the app draws padded on a white tile.
+- **Liquid Glass on cards:** glass only reads when there's something behind it, so in Liquid Glass mode the page gets a faint accent-tinted wash and cards turn slightly clear with a bright rim and a sheen. Cards don't use backdrop blur: the wash is already soft, and blurring every card in a long list makes phone scrolling stutter. Reduce Transparency turns it all off.
+- **Bars that appear on scroll** (the compact title bar, a pushed page's header) transition their blur and tint rather than their opacity. Fading an element with `backdrop-filter` makes WebKit drop the blur mid-fade and snap it back, which was the flicker when scrolling back up. The scrolled state also flips back 12px lower than it flipped on, so a scroll resting near the threshold can't toggle it.
+- **Prizes, redesigned again:** one card instead of a gradient banner, a podium and tiles. The pool, a thin bar showing how it splits between main places, tracks and special awards (in steps of the accent, matching dots on the group tabs), then the selected group as an iOS-style list with gold, silver and bronze place badges.
+
 ## Stats page
 
 - **Where it lives:** a card near the top of Settings (like the account card in iPhone Settings) and a **Your week** card at the bottom of Today. Not a fifth tab: it's a page you visit now and then, and four tabs keep the bar roomy.
