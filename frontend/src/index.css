@@ -421,6 +421,22 @@
   }
 }
 
+/* Switching prize groups: the new list slides in; the old one just goes. */
+@keyframes prize-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+.prize-list {
+  animation: prize-in 0.32s var(--ease-sheet);
+}
+@media (prefers-reduced-motion: reduce) {
+  .prize-list {
+    animation: none;
+  }
+}
+
 /* Sheets and menus animate on Radix's open/closed state; Radix holds the
    element until the closing animation ends, and starts a menu's animation
    only once it's in position. */

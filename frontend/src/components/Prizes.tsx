@@ -1,9 +1,9 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 
 import type { Hackathon, Prize } from "../lib/api";
 import { cleanText, compactMoney, money, prizeFull } from "../lib/format";
-import { rise, spring } from "../lib/motion";
+import { rise } from "../lib/motion";
 import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
 
@@ -162,13 +162,13 @@ export function Prizes({ h, items }: { h: Hackathon; items: PrizeItem[] }) {
         )}
 
         <div className="mt-2">
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.ul key={group.key} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -14 }} transition={spring}>
-              {rows.map((p, i) => (
-                <PrizeRow key={`${p.name}-${p.rank}-${i}`} p={p} lead={i === 0 && p.rank === 1} first={i === 0} />
-              ))}
-            </motion.ul>
-          </AnimatePresence>
+          {/* A new group just slides in (CSS, index.css .prize-list). No exit animation: the old list
+              being lifted out of the layout while it faded made Safari flicker at the end. */}
+          <ul key={group.key} className="prize-list">
+            {rows.map((p, i) => (
+              <PrizeRow key={`${p.name}-${p.rank}-${i}`} p={p} lead={i === 0 && p.rank === 1} first={i === 0} />
+            ))}
+          </ul>
           {group.list.length > SHOWN && (
             <button type="button" onClick={() => setAll((a) => !a)} className="flex h-11 w-full items-center gap-1 border-t hairline px-4 text-subhead font-semibold text-tint">
               {all ? "Show fewer" : `Show all ${group.list.length}`}
