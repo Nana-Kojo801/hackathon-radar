@@ -7,7 +7,7 @@ import { WeekRecap } from "../components/StatsTeasers";
 import { meta } from "../components/HackRow";
 import type { Hackathon } from "../lib/api";
 import { DEFAULT_FILTERS, type Filters } from "../lib/filters";
-import { bannerOf, daysLeft, iconOf, isNew, prizeFull, prizeShort, todayLong, weekday, weekdayDate, fallbackArt, dueTag } from "../lib/format";
+import { bannerOf, daysLeft, iconOf, isNew, nextRefresh, prizeFull, prizeShort, todayLong, weekday, weekdayDate, fallbackArt, dueTag } from "../lib/format";
 import { press, rise, spring } from "../lib/motion";
 import { type Stage, usePersonal } from "../lib/personal";
 import { linkTo, navigate } from "../lib/router";
@@ -58,7 +58,8 @@ export function Today() {
     }
   });
   const showWarning = !!d.warning && d.warning.key !== dismissed;
-  const newLabel = d.newSince ? `since ${weekday(d.newSince)}` : "last 2 days";
+  // "today", "since yesterday", "since Monday": the section title's wording, for the summary tile.
+  const newLabel = freshTitle(d.newSince).replace(/^New (in the )?/, "");
 
   return (
     <div className="pb-32">
@@ -111,6 +112,15 @@ export function Today() {
         </div>
       ) : (
         <>
+          {/* What the radar found since you last looked comes first: the start of the day. */}
+          <NewSection
+            loading={d.loading && !d.items.length}
+            fresh={fresh}
+            title={freshTitle(d.newSince)}
+            lastRefresh={d.meta?.last_refresh ?? null}
+            onSeeAll={() => goExplore({ newOnly: true })}
+          />
+
           <Glance
             loading={d.loading}
             cells={[
@@ -164,16 +174,6 @@ export function Today() {
                 </>
               )}
 
-              {fresh.length > 0 && (
-                <>
-                  <SectionHeader title={d.newSince ? `New since ${weekday(d.newSince)}` : "New this week"} action={`See all ${fresh.length}`} onAction={() => goExplore({ newOnly: true })} />
-                  <div className="no-scrollbar snap-row flex gap-3.5 overflow-x-auto px-4 pb-2">
-                    {fresh.slice(0, 12).map((h, i) => (
-                      <Tile key={h.id} h={h} index={i} />
-                    ))}
-                  </div>
-                </>
-              )}
             </>
           )}
           <WeekRecap />
@@ -330,6 +330,58 @@ function CompactRow({ h, index, last, stage }: { h: Hackathon; index: number; la
         </div>
       </a>
     </motion.li>
+  );
+}
+
+/** "New today", "New since yesterday", "New since Monday": since the start of your previous visit. */
+function freshTitle(since: string | null): string {
+  if (!since) return "New in the last 2 days";
+  const day = (t: Date) => new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
+  const diff = Math.round((day(new Date()) - day(new Date(since))) / 86_400_000);
+  if (diff <= 0) return "New today";
+  if (diff === 1) return "New since yesterday";
+  return `New since ${weekday(since)}`;
+}
+
+function NewSection({ loading, fresh, title, lastRefresh, onSeeAll }: { loading: boolean; fresh: Hackathon[]; title: string; lastRefresh: string | null; onSeeAll: () => void }) {
+  if (loading)
+    return (
+      <div className="mt-6 space-y-3 px-4">
+        <div className="skeleton h-6 w-40 rounded-md" />
+        <div className="flex gap-3.5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skeleton h-[150px] w-[150px] shrink-0 rounded-[20px]" />
+          ))}
+        </div>
+      </div>
+    );
+  if (!fresh.length) {
+    const next = nextRefresh(lastRefresh);
+    const at = new Date(next.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return (
+      <>
+        <SectionHeader title={title.replace(/^New/, "Nothing new")} />
+        <div className="card mx-4 flex items-center gap-4 rounded-[22px] px-4 py-4">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-soft text-tint">
+            <Icon name="refresh" size={24} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-callout font-semibold">You're up to date</p>
+            <p className="text-footnote text-label-2">{next.due ? "The radar is checking for new hackathons now." : `The radar checks again around ${at}.`}</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+  return (
+    <>
+      <SectionHeader title={title} eyebrow={<div className="text-footnote font-semibold tracking-[0.02em] text-tint uppercase">{fresh.length} found</div>} action={fresh.length > 3 ? `See all ${fresh.length}` : undefined} onAction={onSeeAll} />
+      <div className="no-scrollbar snap-row flex gap-3.5 overflow-x-auto px-4 pb-2">
+        {fresh.slice(0, 12).map((h, i) => (
+          <Tile key={h.id} h={h} index={i} />
+        ))}
+      </div>
+    </>
   );
 }
 
