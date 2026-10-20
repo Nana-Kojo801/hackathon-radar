@@ -192,6 +192,13 @@ export default function App() {
     window.scrollTo(0, inScroll);
     if (!outEl || !inEl) return;
     inEl.style.setProperty("--tab-scroll", `${inScroll}px`);
+    // Each page is clipped to what's on screen above the tab bar while it moves: Safari then moves
+    // one screenful instead of a whole page (smooth), and nothing moves behind the bar's glass,
+    // which it would otherwise re-blur every frame (choppy, and it dropped the bar out of view).
+    const bar = document.querySelector('nav[aria-label="Tabs"]')?.getBoundingClientRect().top ?? window.innerHeight;
+    const clip = (el: HTMLElement, scroll: number) => `inset(${scroll}px 0 ${Math.max(0, el.offsetHeight - scroll - bar)}px 0)`;
+    outEl.style.clipPath = clip(outEl, outScroll);
+    inEl.style.clipPath = clip(inEl, inScroll);
     const dir = TAB_ORDER.indexOf(route.tab) > TAB_ORDER.indexOf(from) ? 1 : -1;
     const w = window.innerWidth;
     const reset = (finished = true) => {
@@ -201,7 +208,7 @@ export default function App() {
       if (finished) outEl.hidden = true;
       for (const el of [outEl, inEl]) {
         el.getAnimations().forEach((a) => a.cancel());
-        for (const k of ["position", "top", "left", "right", "pointer-events", "transform", "--tab-scroll"]) el.style.removeProperty(k);
+        for (const k of ["position", "top", "left", "right", "pointer-events", "transform", "clip-path", "--tab-scroll"]) el.style.removeProperty(k);
       }
       endSlide.current = null;
       setTabs((t) => (t.leaving === from ? { ...t, leaving: null } : t));
@@ -236,6 +243,26 @@ export default function App() {
   // animation, and fading the page in glitched its glass in Safari.
   const [visited, setVisited] = useState<Set<Tab>>(() => new Set([route.tab]));
   if (!visited.has(route.tab)) setVisited(new Set(visited).add(route.tab));
+  // The other tabs are built once the first one has settled, one at a time when the phone is idle,
+  // so a first visit doesn't stall its slide.
+  const visitedNow = useRef(visited);
+  visitedNow.current = visited;
+  useEffect(() => {
+    let cancelled = false;
+    let timer: number | undefined;
+    const idle = (fn: () => void) => (typeof window.requestIdleCallback === "function" ? window.requestIdleCallback(fn, { timeout: 2000 }) : window.setTimeout(fn, 200));
+    const next = () => {
+      const tab = TAB_ORDER.find((t) => !visitedNow.current.has(t));
+      if (cancelled || !tab) return;
+      setVisited((v) => new Set(v).add(tab));
+      timer = window.setTimeout(() => idle(next), 400);
+    };
+    timer = window.setTimeout(() => idle(next), 1200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, []);
 
   const render = (o: Overlay): ReactNode => {
     if (o.kind === "detail") return <Detail id={o.id} initial={live.get(o.id) ?? personal.items[o.id]?.hackathon} />;

@@ -28,6 +28,9 @@ export function TabBar({ active, hidden, badge, onReselect }: { active: Tab; hid
         transform: `translate3d(-50%, ${hidden ? 140 : 0}px, 0)`,
         opacity: hidden ? 0 : 1,
         transition: `transform ${duration("page")}ms ${easing("page")}, opacity ${duration("page") * 0.6}ms ease-out`,
+        // Its own layer, always, so it's never drawn together with the pages moving under it.
+        willChange: "transform",
+        isolation: "isolate",
       }}
     >
       <div className="relative grid h-full grid-cols-4">
