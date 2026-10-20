@@ -171,3 +171,8 @@ A small static FX table (`normalize.FX_TO_USD`) converts INR/EUR/CAD/etc. right 
 - **Progress comes from two places:** GitHub's view of the refresh and publish workflows (queued, running, finished, failed) and the pipeline's own record: each source's row as it finishes, plus `stage` and per-step numbers (`progress`) on the run's `pipeline` row (migration 011). The app polls `GET /me/refresh` every 3 seconds while a run is going and every 30 seconds otherwise, only while Settings is on screen; GitHub's answers are cached for 4 seconds.
 - Scheduled runs show up the same way, so the card is also a live view of the 6-hourly refresh.
 
+## Telling the user what actually failed
+
+- Requests that fail carry the HTTP status, and `lib/errors.ts` turns a failure into one plain sentence: a 404 means the server is running an older version (it answers, but doesn't have the route), 401 a rejected key, 5xx an error on the server, and push-subscription errors get their own wording. Before this, turning on notifications said "couldn't reach the server" for everything, which sent us looking at the wrong thing when Render simply hadn't deployed the push routes.
+- `GET /health` reports the commit the server is running (`RENDER_GIT_COMMIT`) and whether push is configured, so a deploy can be checked from the browser.
+

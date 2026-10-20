@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { fetchData } from "./api";
+import { explainError } from "./errors";
 import { call, personalState, usePersonal } from "./personal";
 
 /**
@@ -84,10 +85,11 @@ const inflight = new Map<string, { at: number; promise: Promise<unknown> }>();
 /** Pages that share a stat (Today, Settings, Stats) reuse one request for a couple of minutes. */
 const FRESH_MS = 2 * 60_000;
 
-function useCached<T>(cacheKey: string, load: (() => Promise<T>) | null): { data: T | null; loading: boolean; error: string | null; retry: () => void } {
+function useCached<T>(cacheKey: string, load: (() => Promise<T>) | null): { data: T | null; loading: boolean; error: string | null; errorText: string; retry: () => void } {
   const [data, setData] = useState<T | null>(() => loadJSON<T | null>(cacheKey, null));
   const [loading, setLoading] = useState(!!load);
   const [error, setError] = useState<string | null>(null);
+  const [errorText, setErrorText] = useState("");
   // A failed load is retried quietly a few times (the API may be waking up or mid-deploy).
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -117,6 +119,7 @@ function useCached<T>(cacheKey: string, load: (() => Promise<T>) | null): { data
         if (attempt < 3) timer = window.setTimeout(() => setAttempt((a) => a + 1), 2500 * (attempt + 1));
         else {
           setError(e instanceof Error ? e.message : String(e));
+          setErrorText(explainError(e, "these stats").text);
           setLoading(false);
         }
       });
@@ -130,7 +133,7 @@ function useCached<T>(cacheKey: string, load: (() => Promise<T>) | null): { data
     setError(null);
     setAttempt((a) => (a >= 3 ? 1 : a + 1));
   };
-  return { data, loading, error, retry };
+  return { data, loading, error, errorText, retry };
 }
 
 export function useMyStats() {

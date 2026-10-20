@@ -104,8 +104,8 @@ export async function fetchJSON<T>(path: string, signal?: AbortSignal, attempts 
     try {
       const res = await fetch(`${API_URL}${path}`, { signal: ctrl.signal });
       if (res.ok) return (await res.json()) as T;
-      if (res.status < 500) throw Object.assign(new Error(`HTTP ${res.status}`), { fatal: true });
-      lastError = new Error(`HTTP ${res.status}`);
+      if (res.status < 500) throw Object.assign(new Error(`HTTP ${res.status}`), { fatal: true, status: res.status });
+      lastError = Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     } catch (e) {
       if (signal?.aborted || (e as { fatal?: boolean }).fatal) throw e;
       lastError = e;

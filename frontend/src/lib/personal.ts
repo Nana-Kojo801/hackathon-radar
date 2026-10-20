@@ -148,8 +148,8 @@ export async function call<T>(path: string, init: { method?: string; body?: unkn
       });
       if (res.status === 401 || res.status === 503) throw new KeyError(`HTTP ${res.status}`);
       if (res.ok) return (await res.json()) as T;
-      if (res.status < 500) throw Object.assign(new Error(`HTTP ${res.status}`), { fatal: true });
-      last = new Error(`HTTP ${res.status}`);
+      if (res.status < 500) throw Object.assign(new Error(`HTTP ${res.status}`), { fatal: true, status: res.status });
+      last = Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     } catch (e) {
       if (e instanceof KeyError || (e as { fatal?: boolean }).fatal) throw e;
       last = e;

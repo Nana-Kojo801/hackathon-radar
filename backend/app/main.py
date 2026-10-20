@@ -1,4 +1,5 @@
 import logging
+import os
 import secrets
 import threading
 from typing import Annotated, Literal
@@ -75,7 +76,8 @@ def health() -> dict:
     except Exception as e:  # report, don't crash: Render pings this
         log.warning("health db check failed: %s", e)
         ok = False
-    return {"ok": True, "db": ok}
+    # Render sets RENDER_GIT_COMMIT: which commit this server is running, to check a deploy landed.
+    return {"ok": True, "db": ok, "commit": os.getenv("RENDER_GIT_COMMIT", "")[:7] or None, "push": bool(config.VAPID_PRIVATE_KEY)}
 
 
 def _split(values: list[str] | None) -> list[str]:

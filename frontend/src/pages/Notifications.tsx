@@ -9,6 +9,7 @@ import { compactMoney, imageOf, prizeShort } from "../lib/format";
 import { bouncy, spring } from "../lib/motion";
 import { type Settings, updateSettings, usePersonal } from "../lib/personal";
 import { disablePush, enablePush, type PushStatus, testPush, usePushStatus } from "../lib/push";
+import { explainError } from "../lib/errors";
 import { linkTo } from "../lib/router";
 import { useData } from "../lib/store";
 import { toast } from "../lib/toast";
@@ -29,6 +30,8 @@ export function NotificationsPage() {
   const look = useAppearance();
   const [status, setStatus, refresh] = usePushStatus();
   const [busy, setBusy] = useState(false);
+  // Why the last attempt failed, kept on screen (a toast vanishes before it can be read).
+  const [problem, setProblem] = useState<string | null>(null);
   const s = p.settings;
   const set = (patch: Partial<Settings>) => updateSettings(patch);
   const on = status === "on";
@@ -46,12 +49,13 @@ export function NotificationsPage() {
   const toggle = async (want: boolean) => {
     setBusy(true);
     try {
+      setProblem(null);
       const next = want ? await enablePush() : await disablePush();
       setStatus(next);
       if (next === "on") toast("Notifications on", "bell");
       else if (next === "server-off") toast("Push isn't set up on the server yet", "alert");
-    } catch {
-      toast("Couldn't reach the server. Try again in a minute.", "alert");
+    } catch (e) {
+      setProblem(explainError(e, "notifications").text);
       refresh();
     } finally {
       setBusy(false);
@@ -72,7 +76,7 @@ export function NotificationsPage() {
           <div className="flex min-h-[60px] items-center gap-3 px-4 py-2.5">
             <span className="min-w-0 flex-1">
               <span className="block text-body font-semibold">Allow notifications</span>
-              <StatusLine status={status} devices={s?.push_devices ?? 0} />
+              {problem ? <span className="block text-footnote leading-snug text-red">{problem}</span> : <StatusLine status={status} devices={s?.push_devices ?? 0} />}
             </span>
             {busy ? (
               <span className="spin h-6 w-6 rounded-full border-[2.5px] border-track border-t-accent" />

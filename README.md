@@ -133,6 +133,8 @@ Any of these works:
 
 A Postgres advisory lock stops two refreshes from running at once.
 
+**Check what Render is running:** open `https://<your-render-url>/health`. `commit` is the deployed commit (compare it with the latest on `main`) and `push` says whether `VAPID_PRIVATE_KEY` is set. `/push/key` returns the public key once push is set up; a 404 there means the deploy is older than the push feature.
+
 ## Frontend
 
 An iPhone-style app, built phone first: large titles, grouped cards, a floating glass tab bar, swipe actions and sheets. On a laptop the same screens sit in a centred column.

@@ -49,12 +49,12 @@ export function StatsPage() {
               ) : me.data ? (
                 <You s={me.data} />
               ) : (
-                <Loading error={me.error} retry={me.retry} />
+                <Loading error={me.error && me.errorText} retry={me.retry} />
               )
             ) : market.data ? (
               <Market s={market.data} />
             ) : (
-              <Loading error={market.error} retry={market.retry} />
+              <Loading error={market.error && market.errorText} retry={market.retry} />
             )}
         </div>
       </div>
@@ -114,7 +114,7 @@ function Loading({ error, retry }: { error: string | null; retry: () => void }) 
   if (error)
     return (
       <Card className="mt-4">
-        <p className="text-subhead text-label-2">Couldn't load your stats. The server may be waking up or updating.</p>
+        <p className="text-subhead text-label-2">{error}</p>
         <PrimaryButton onClick={retry} className="mt-3 h-10 w-full text-subhead">
           Try again
         </PrimaryButton>

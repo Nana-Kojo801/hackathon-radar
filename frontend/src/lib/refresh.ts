@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { TabActiveContext } from "../components/kit";
+import { explainError } from "./errors";
 import { call, usePersonal } from "./personal";
 
 /**
@@ -107,6 +108,7 @@ export function useRefresh() {
   const [requestedAt, setRequestedAt] = useState<number | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusProblem, setStatusProblem] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const phase = phaseOf(status, requestedAt);
   const running = phase.state === "running";
@@ -117,8 +119,11 @@ export function useRefresh() {
     inflight.current = true;
     try {
       setStatus(await call<RefreshStatus>("/me/refresh"));
-    } catch {
-      /* the next poll tries again */
+      setStatusProblem(null);
+    } catch (e) {
+      // The next poll tries again; if the server is just old, say so.
+      const x = explainError(e, "this");
+      setStatusProblem(x.outdated ? x.text : null);
     } finally {
       inflight.current = false;
     }
@@ -146,12 +151,12 @@ export function useRefresh() {
       setTick((t) => t + 1);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(msg.includes("409") ? "A refresh is already running." : msg.includes("503") ? "Needs a GitHub token on the server first." : "Couldn't start it. Try again in a moment.");
+      setError(msg.includes("409") ? "A refresh is already running." : msg.includes("503") ? "Needs a GitHub token on the server first." : explainError(e, "this").text);
       setTick((t) => t + 1);
     } finally {
       setStarting(false);
     }
   }, []);
 
-  return { status, phase, start, starting, error };
+  return { status, phase, start, starting, error: error ?? statusProblem };
 }
