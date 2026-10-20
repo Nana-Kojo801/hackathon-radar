@@ -6,7 +6,6 @@ import { Icon, type IconName } from "../components/Icon";
 import { PrimaryButton, Segmented } from "../components/kit";
 import { OverlayPage } from "../components/OverlayPage";
 import { categoryLabel, compactMoney, dayMonth, FORMAT_LABEL, SOURCE_NAME } from "../lib/format";
-import { rise } from "../lib/motion";
 import { usePersonal } from "../lib/personal";
 import { linkTo, navigate } from "../lib/router";
 import { type MarketStats, type MyStats, type OpenSource, useMarketStats, useMyStats } from "../lib/stats";
@@ -19,6 +18,8 @@ type View = "you" | "market";
 export function StatsPage() {
   const p = usePersonal();
   const [view, setView] = useState<View>(p.key ? "you" : "market");
+  // The views slide when switched, not on opening the page (it's already sliding in).
+  const [switched, setSwitched] = useState(false);
   const me = useMyStats();
   const market = useMarketStats();
 
@@ -30,7 +31,10 @@ export function StatsPage() {
         <Segmented
           label="Stats for"
           value={view}
-          onChange={setView}
+          onChange={(v) => {
+            setView(v);
+            setSwitched(true);
+          }}
           options={[
             { value: "you", label: "You" },
             { value: "market", label: "Market" },
@@ -38,19 +42,19 @@ export function StatsPage() {
           className="mx-4 mt-4"
         />
         {/* Keyed, so the other view slides in (.swap-in in index.css). */}
-        <div key={view} className="swap-in">
+        <div key={view} className={switched ? "swap-in" : undefined}>
             {view === "you" ? (
               !p.key ? (
                 <ConnectPrompt />
               ) : me.data ? (
                 <You s={me.data} />
               ) : (
-                <Loading error={me.error} />
+                <Loading error={me.error} retry={me.retry} />
               )
             ) : market.data ? (
               <Market s={market.data} />
             ) : (
-              <Loading error={market.error} />
+              <Loading error={market.error} retry={market.retry} />
             )}
         </div>
       </div>
@@ -60,13 +64,13 @@ export function StatsPage() {
 
 // ---------------------------------------------------------------- building blocks
 
-function Card({ title, sub, children, className, i = 0 }: { title?: string; sub?: ReactNode; children: ReactNode; className?: string; i?: number }) {
+function Card({ title, sub, children, className }: { title?: string; sub?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <motion.section {...rise(i)} className={cn("card mx-4 mt-3 rounded-[22px] p-4", className)}>
+    <section className={cn("card mx-4 mt-3 rounded-[22px] p-4", className)}>
       {title && <h3 className="text-headline font-semibold tracking-[-0.02em]">{title}</h3>}
       {sub && <p className="mt-0.5 text-footnote text-label-2">{sub}</p>}
       <div className={cn(title && "mt-4")}>{children}</div>
-    </motion.section>
+    </section>
   );
 }
 
@@ -74,19 +78,19 @@ function Heading({ children }: { children: ReactNode }) {
   return <h2 className="mx-5 mt-8 mb-0.5 text-title3 font-bold tracking-[-0.022em]">{children}</h2>;
 }
 
-function Tile({ icon, tone = "text-tint", value, label, i = 0 }: { icon: IconName; tone?: string; value: ReactNode; label: ReactNode; i?: number }) {
+function Tile({ icon, tone = "text-tint", value, label }: { icon: IconName; tone?: string; value: ReactNode; label: ReactNode }) {
   return (
-    <motion.div {...rise(i)} className="card flex min-w-0 flex-col rounded-[20px] p-3.5">
+    <div className="card flex min-w-0 flex-col rounded-[20px] p-3.5">
       <Icon name={icon} size={20} className={tone} />
       <div className="mt-2.5 truncate text-title2 font-bold tracking-[-0.025em] tabular">{value}</div>
       <div className="text-footnote leading-snug text-label-2">{label}</div>
-    </motion.div>
+    </div>
   );
 }
 
 function Hero({ eyebrow, lead, figure, line, pills }: { eyebrow: string; lead: string; figure: string; line: ReactNode; pills: string[] }) {
   return (
-    <motion.div {...rise(0)} className="mx-4 mt-4 overflow-hidden rounded-[24px] p-5 text-on-accent" style={{ background: "linear-gradient(140deg, var(--accent-hi) 0%, var(--accent) 72%)" }}>
+    <div className="mx-4 mt-4 overflow-hidden rounded-[24px] p-5 text-on-accent" style={{ background: "linear-gradient(140deg, var(--accent-hi) 0%, var(--accent) 72%)" }}>
       <div className="text-footnote font-semibold tracking-[0.03em] uppercase opacity-80">{eyebrow}</div>
       <div className="mt-2 text-callout font-medium opacity-90">{lead}</div>
       <div className="text-[56px] leading-[1.05] font-bold tracking-[-0.04em]">{figure}</div>
@@ -98,7 +102,7 @@ function Hero({ eyebrow, lead, figure, line, pills }: { eyebrow: string; lead: s
           </span>
         ))}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -106,8 +110,16 @@ function Empty({ children }: { children: ReactNode }) {
   return <p className="rounded-[14px] bg-card-2 px-3.5 py-3 text-footnote text-label-2">{children}</p>;
 }
 
-function Loading({ error }: { error: string | null }) {
-  if (error) return <Card className="mt-4">{<p className="text-subhead text-label-2">Couldn't load stats ({error}). The server may be waking up; try again in a minute.</p>}</Card>;
+function Loading({ error, retry }: { error: string | null; retry: () => void }) {
+  if (error)
+    return (
+      <Card className="mt-4">
+        <p className="text-subhead text-label-2">Couldn't load your stats. The server may be waking up or updating.</p>
+        <PrimaryButton onClick={retry} className="mt-3 h-10 w-full text-subhead">
+          Try again
+        </PrimaryButton>
+      </Card>
+    );
   return (
     <div className="mt-4 space-y-3 px-4" aria-busy="true">
       {[180, 120, 220].map((h, i) => (
@@ -185,10 +197,10 @@ function You({ s }: { s: MyStats }) {
 
       <Heading>This week</Heading>
       <div className="mx-4 mt-2.5 grid grid-cols-2 gap-3">
-        <Tile i={1} icon="home" value={s.recap.opens} label="times you opened the app" />
-        <Tile i={2} icon="eye" value={s.recap.views} label="hackathons you looked at" />
-        <Tile i={3} icon="bookmark" tone="text-orange" value={s.recap.saved} label="saved" />
-        <Tile i={4} icon="ticket" tone="text-green" value={s.recap.registered} label="registered for" />
+        <Tile icon="home" value={s.recap.opens} label="times you opened the app" />
+        <Tile icon="eye" value={s.recap.views} label="hackathons you looked at" />
+        <Tile icon="bookmark" tone="text-orange" value={s.recap.saved} label="saved" />
+        <Tile icon="ticket" tone="text-green" value={s.recap.registered} label="registered for" />
       </div>
 
       <Heading>Your funnel</Heading>
@@ -196,7 +208,7 @@ function You({ s }: { s: MyStats }) {
         <Funnel steps={steps} />
       </Card>
 
-      <Card title="Results" i={1}>
+      <Card title="Results">
         {results ? (
           <div className="flex items-center gap-5">
             <Ring value={f.won} total={results}>
@@ -214,7 +226,7 @@ function You({ s }: { s: MyStats }) {
         )}
       </Card>
 
-      <Card title="Month by month" sub="Hackathons you saved and registered for." i={2}>
+      <Card title="Month by month" sub="Hackathons you saved and registered for.">
         <Columns
           series={[
             { name: "Saved", color: "color-mix(in srgb, var(--accent) 38%, var(--card-2))" },
@@ -235,16 +247,16 @@ function You({ s }: { s: MyStats }) {
 
       <Heading>How you use the app</Heading>
       <div className="mx-4 mt-2.5 grid grid-cols-3 gap-3">
-        <Tile i={1} icon="flame" tone="text-orange" value={a.streak} label={`day streak`} />
-        <Tile i={2} icon="trophy" tone="text-tint" value={a.longest_streak} label="longest streak" />
-        <Tile i={3} icon="calendar" tone="text-green" value={a.active_days_30} label="active days of 30" />
+        <Tile icon="flame" tone="text-orange" value={a.streak} label={`day streak`} />
+        <Tile icon="trophy" tone="text-tint" value={a.longest_streak} label="longest streak" />
+        <Tile icon="calendar" tone="text-green" value={a.active_days_30} label="active days of 30" />
       </div>
       {a.since ? (
         <>
           <Card title="Opens per week" sub={`${a.opens} opens and ${a.views} hackathons viewed since ${dayMonth(a.since)}.`}>
             <Columns data={a.per_week.map((w) => ({ label: weekLabel(w.week), values: [w.count] }))} tip={(i) => `Week of ${weekLabel(a.per_week[i].week)}`} />
           </Card>
-          <Card title="When you check" sub={busiest?.v ? `Most often ${WEEKDAYS[busiest.r]}s, ${BLOCK_RANGE[busiest.c]} (${s.timezone.replace("_", " ")}).` : "Last 90 days."} i={1}>
+          <Card title="When you check" sub={busiest?.v ? `Most often ${WEEKDAYS[busiest.r]}s, ${BLOCK_RANGE[busiest.c]} (${s.timezone.replace("_", " ")}).` : "Last 90 days."}>
             <HeatGrid
               grid={a.heatmap}
               rows={WEEKDAYS.map((d) => d.slice(0, 2))}
@@ -252,7 +264,7 @@ function You({ s }: { s: MyStats }) {
               describe={(r, c, v) => `${WEEKDAYS[r]}, ${BLOCK_RANGE[c]}: ${v} open${v === 1 ? "" : "s"}`}
             />
           </Card>
-          <Card title="How you get here" sub={topSource?.n ? `${topSource.label === "Email" ? "Emails bring" : topSource.label === "Notification" ? "Notifications bring" : `The ${topSource.label} brings`} you back most often.` : undefined} i={2}>
+          <Card title="How you get here" sub={topSource?.n ? `${topSource.label === "Email" ? "Emails bring" : topSource.label === "Notification" ? "Notifications bring" : `The ${topSource.label} brings`} you back most often.` : undefined}>
             <StackBar parts={SOURCES.map((x) => ({ label: x.label, value: a.sources[x.key], color: x.color }))} />
           </Card>
         </>
@@ -264,9 +276,9 @@ function You({ s }: { s: MyStats }) {
 
       <Heading>Habits</Heading>
       <div className="mx-4 mt-2.5 grid grid-cols-3 gap-3">
-        <Tile i={1} icon="clock" value={days(s.habits.save_to_register_days)} label="from saving to registering" />
-        <Tile i={2} icon="calendar" tone="text-green" value={days(s.habits.lead_days)} label="before the deadline you register" />
-        <Tile i={3} icon="alert" tone="text-orange" value={pct(s.habits.last_minute_pct)} label="registered in the last 48 h" />
+        <Tile icon="clock" value={days(s.habits.save_to_register_days)} label="from saving to registering" />
+        <Tile icon="calendar" tone="text-green" value={days(s.habits.lead_days)} label="before the deadline you register" />
+        <Tile icon="alert" tone="text-orange" value={pct(s.habits.last_minute_pct)} label="registered in the last 48 h" />
       </div>
       <p className="mx-5 mt-2 text-footnote text-label-2">Typical (median) values over {s.habits.registrations} registration{s.habits.registrations === 1 ? "" : "s"}.</p>
 
@@ -285,14 +297,14 @@ function You({ s }: { s: MyStats }) {
           <Empty>Save a few hackathons to see what you go for.</Empty>
         )}
       </Card>
-      <Card title="Format" i={1}>
+      <Card title="Format">
         <PairBars
           a={{ name: "Your saves", color: "var(--accent)" }}
           b={{ name: "All listings", color: "var(--viz-muted)" }}
           rows={s.formats.filter((x) => x.market > 0).map((x) => ({ label: FORMAT_LABEL[x.key as Format] ?? x.key, a: x.mine / savedTotal, b: x.market / Math.max(1, f.listed) }))}
         />
       </Card>
-      <Card title="Prize money" sub="Average prize pool." i={2}>
+      <Card title="Prize money" sub="Average prize pool.">
         <HBars
           format={(n) => compactMoney(n)}
           rows={[
@@ -408,7 +420,7 @@ function Market({ s }: { s: MarketStats }) {
           <Empty>Weekly counts start after the radar's first full week.</Empty>
         )}
       </Card>
-      <Card title="Deadlines ahead" sub={busiestDay ? `Busiest day: ${new Date(busiestDay[0] + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, with ${busiestDay[1]} closing.` : "Registration deadlines over the next 8 weeks."} i={1}>
+      <Card title="Deadlines ahead" sub={busiestDay ? `Busiest day: ${new Date(busiestDay[0] + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, with ${busiestDay[1]} closing.` : "Registration deadlines over the next 8 weeks."}>
         <CalendarHeat
           counts={s.closing}
           describe={(d, v) => `${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}: ${v} closing`}
@@ -419,23 +431,23 @@ function Market({ s }: { s: MarketStats }) {
       <Card title="Prize sizes" sub="Open hackathons by total prize pool.">
         <HBars rows={s.prize_buckets.map((b) => ({ label: b.label, value: b.count, color: b.label === "Not stated" ? "var(--viz-muted)" : undefined }))} labelWidth={84} />
       </Card>
-      <Card title="Themes" sub="Open hackathons by theme; one can have several." i={1}>
+      <Card title="Themes" sub="Open hackathons by theme; one can have several.">
         <HBars rows={s.categories.filter((c) => c.category !== "open-ended").slice(0, 8).map((c) => ({ label: categoryLabel(c.category), value: c.count }))} />
       </Card>
-      <Card title="Platforms" i={2}>
+      <Card title="Platforms">
         <HBars rows={s.by_source.map((x) => ({ label: platform(x.source), value: x.count }))} labelWidth={84} />
       </Card>
 
       <Heading>Radar health</Heading>
       <div className="mx-4 mt-2.5 grid grid-cols-3 gap-3">
-        <Tile i={1} icon="refresh" value={runs.runs} label="refreshes in 14 days" />
-        <Tile i={2} icon={runs.errors ? "alert" : "check"} tone={runs.errors ? "text-orange" : "text-green"} value={runs.errors} label="source errors" />
-        <Tile i={3} icon="sparkle" value={compact(runs.tokens)} label="AI tokens used" />
+        <Tile icon="refresh" value={runs.runs} label="refreshes in 14 days" />
+        <Tile icon={runs.errors ? "alert" : "check"} tone={runs.errors ? "text-orange" : "text-green"} value={runs.errors} label="source errors" />
+        <Tile icon="sparkle" value={compact(runs.tokens)} label="AI tokens used" />
       </div>
       <Card title="New listings found per day" sub={`${runs.new} in the last 14 days.`}>
         <Columns data={runDays.map((r) => ({ label: dayMonth(r.day), values: [r.new] }))} height={110} />
       </Card>
-      <Card title="AI tokens per day" sub="Enrichment, web discovery and description tidying." i={1}>
+      <Card title="AI tokens per day" sub="Enrichment, web discovery and description tidying.">
         <Columns data={runDays.map((r) => ({ label: dayMonth(r.day), values: [r.tokens] }))} height={110} series={[{ name: "Tokens", color: "var(--viz-muted)" }]} />
       </Card>
       <p className="mx-5 mt-3 text-footnote text-label-2">Updated {new Date(s.generated_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}.</p>

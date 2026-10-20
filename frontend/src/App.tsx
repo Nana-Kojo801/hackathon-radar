@@ -192,11 +192,10 @@ export default function App() {
     window.scrollTo(0, inScroll);
     if (!outEl || !inEl) return;
     inEl.style.setProperty("--tab-scroll", `${inScroll}px`);
-    // Each page is clipped to what's on screen above the tab bar while it moves: Safari then moves
-    // one screenful instead of a whole page (smooth), and nothing moves behind the bar's glass,
-    // which it would otherwise re-blur every frame (choppy, and it dropped the bar out of view).
-    const bar = document.querySelector('nav[aria-label="Tabs"]')?.getBoundingClientRect().top ?? window.innerHeight;
-    const clip = (el: HTMLElement, scroll: number) => `inset(${scroll}px 0 ${Math.max(0, el.offsetHeight - scroll - bar)}px 0)`;
+    // Each page is clipped to the screen while it moves, so Safari moves one screenful instead of a
+    // whole page. The full screen, bar area included: clipping above the bar left a strip that
+    // filled in when the slide ended, which showed as a flicker under the bar.
+    const clip = (el: HTMLElement, scroll: number) => `inset(${scroll}px 0 ${Math.max(0, el.offsetHeight - scroll - window.innerHeight)}px 0)`;
     outEl.style.clipPath = clip(outEl, outScroll);
     inEl.style.clipPath = clip(inEl, inScroll);
     const dir = TAB_ORDER.indexOf(route.tab) > TAB_ORDER.indexOf(from) ? 1 : -1;
@@ -280,7 +279,9 @@ export default function App() {
   return (
     <DataContext.Provider value={data}>
       <MotionConfig reducedMotion="user">
-        <div ref={under} className="relative min-h-dvh">
+        {/* overflow-x: clip, so a tab sliding in from the right can't make the page wider than the
+            screen; Safari then shifted its fixed layer, and the tab bar with it. */}
+        <div ref={under} className="relative min-h-dvh overflow-x-clip">
           {TAB_ORDER.filter((t) => visited.has(t)).map((t) => (
             <main
               key={t}

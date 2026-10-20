@@ -84,19 +84,22 @@ const inflight = new Map<string, { at: number; promise: Promise<unknown> }>();
 /** Pages that share a stat (Today, Settings, Stats) reuse one request for a couple of minutes. */
 const FRESH_MS = 2 * 60_000;
 
-function useCached<T>(cacheKey: string, load: (() => Promise<T>) | null): { data: T | null; loading: boolean; error: string | null } {
+function useCached<T>(cacheKey: string, load: (() => Promise<T>) | null): { data: T | null; loading: boolean; error: string | null; retry: () => void } {
   const [data, setData] = useState<T | null>(() => loadJSON<T | null>(cacheKey, null));
   const [loading, setLoading] = useState(!!load);
   const [error, setError] = useState<string | null>(null);
+  // A failed load is retried quietly a few times (the API may be waking up or mid-deploy).
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!load) {
       setLoading(false);
       return;
     }
     let live = true;
+    let timer: number | undefined;
     setLoading(true);
     let req = inflight.get(cacheKey);
-    if (!req || Date.now() - req.at > FRESH_MS) {
+    if (!req || attempt > 0 || Date.now() - req.at > FRESH_MS) {
       req = { at: Date.now(), promise: load() };
       inflight.set(cacheKey, req);
       req.promise.catch(() => inflight.delete(cacheKey));
@@ -106,16 +109,28 @@ function useCached<T>(cacheKey: string, load: (() => Promise<T>) | null): { data
         if (!live) return;
         setData(d);
         setError(null);
+        setLoading(false);
         save(cacheKey, d);
       })
-      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => live && setLoading(false));
+      .catch((e) => {
+        if (!live) return;
+        if (attempt < 3) timer = window.setTimeout(() => setAttempt((a) => a + 1), 2500 * (attempt + 1));
+        else {
+          setError(e instanceof Error ? e.message : String(e));
+          setLoading(false);
+        }
+      });
     return () => {
       live = false;
+      window.clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cacheKey, !!load]);
-  return { data, loading, error };
+  }, [cacheKey, !!load, attempt]);
+  const retry = () => {
+    setError(null);
+    setAttempt((a) => (a >= 3 ? 1 : a + 1));
+  };
+  return { data, loading, error, retry };
 }
 
 export function useMyStats() {
