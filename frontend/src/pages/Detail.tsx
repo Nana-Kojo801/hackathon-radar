@@ -18,6 +18,7 @@ import {
   hostOf,
   iconOf,
   prizeShort,
+  siteOf,
   sourceName,
   timeAgo,
   timeUtc,
@@ -104,7 +105,9 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
   const stage: Stage | null = t?.status ?? null;
   const saved = stage !== null && stage !== "hidden";
   const source = sourceName(h);
-  const register = `Register on ${source === "the web" ? hostOf(h.source_url) : source}`;
+  // Where you register, when it fits on the button: a long site name makes it just "Register".
+  const site = source === "the web" ? siteOf(h.source_url) : source;
+  const register = site.length <= 16 ? `Register on ${site}` : "Register";
   const days = daysLeft(h);
   const [bannerFailed, setBannerFailed] = useState(false);
   const banner = bannerFailed ? null : bannerOf(h);
@@ -151,11 +154,11 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
                 rel="noopener noreferrer"
                 whileTap={press}
                 transition={bouncy}
-                className="flex h-12 flex-col items-center justify-center rounded-full bg-accent px-6 text-on-accent hover:brightness-110"
+                className="flex h-12 max-w-[320px] min-w-0 flex-col items-center justify-center rounded-full bg-accent px-6 text-on-accent hover:brightness-110"
               >
-                <span className="flex items-center gap-1.5 text-callout font-semibold">
-                  {register}
-                  <Icon name="arrowUpRight" size={15} stroke={2.8} />
+                <span className="flex max-w-full items-center gap-1.5 text-callout font-semibold">
+                  <span className="truncate">{register}</span>
+                  <Icon name="arrowUpRight" size={15} stroke={2.8} className="shrink-0" />
                 </span>
                 {days !== null && days >= 0 && <span className="text-caption font-medium opacity-85">{days === 0 ? "Closes today" : days === 1 ? "Closes tomorrow" : `Closes in ${days} days`}</span>}
               </motion.a>
@@ -241,11 +244,11 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
             rel="noopener noreferrer"
             whileTap={press}
             transition={bouncy}
-            className="flex h-[54px] flex-1 flex-col items-center justify-center rounded-full bg-accent text-on-accent"
+            className="flex h-[54px] min-w-0 flex-1 flex-col items-center justify-center rounded-full bg-accent px-5 text-on-accent"
           >
-            <span className="flex items-center gap-1.5 text-body font-semibold">
-              {register}
-              <Icon name="arrowUpRight" size={15} stroke={2.8} />
+            <span className="flex max-w-full items-center gap-1.5 text-body font-semibold">
+              <span className="truncate">{register}</span>
+              <Icon name="arrowUpRight" size={15} stroke={2.8} className="shrink-0" />
             </span>
             {days !== null && days >= 0 && <span className="text-caption font-medium opacity-85">{days === 0 ? "Closes today" : days === 1 ? "Closes tomorrow" : `Closes in ${days} days`}</span>}
           </motion.a>

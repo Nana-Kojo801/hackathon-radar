@@ -151,12 +151,7 @@ export function Today() {
             <aside aria-label="At a glance" className="flex w-[340px] shrink-0 flex-col gap-5">
               <Glance loading={d.loading} cells={glance} className="mx-0 mt-0" />
               <DeadlineList tracked={tracked} />
-              {spots.length > 0 && (
-                <section aria-label="Spotlight">
-                  <h2 className="mb-2 text-headline font-semibold tracking-[-0.02em]">Spotlight</h2>
-                  <Spotlights spots={spots} rail />
-                </section>
-              )}
+              {spots.length > 0 && <Spotlights spots={spots} rail />}
               <WeekRecap className="mx-0 mt-0" />
             </aside>
           </div>
@@ -230,12 +225,7 @@ export function Today() {
             <TodaySkeleton />
           ) : (
             <>
-              {spots.length > 0 && (
-                <>
-                  <SectionHeader title="Spotlight" />
-                  <Spotlights spots={spots} />
-                </>
-              )}
+              {spots.length > 0 && <Spotlights spots={spots} />}
 
               {closingTop.length > 0 && (
                 <>
@@ -318,80 +308,96 @@ function DeadlineCard({ h, status, days, index }: { h: Hackathon; status: Stage;
   );
 }
 
-/** A wide banner fills the card; otherwise the square icon sits on a blurred wash of itself. */
-function Hero({ h, className, stacked, spot }: { h: Hackathon; className?: string; stacked?: boolean; spot?: Spotlight }) {
+/**
+ * One spotlight, on a dark stage lit in its colour: the artwork, then why it's here (the label and a
+ * line on why) before the hackathon itself, so a long title never hides the reason.
+ */
+function SpotCard({ s, rail }: { s: Spotlight; rail?: boolean }) {
+  const { h, tone } = s;
   const [bannerFailed, setBannerFailed] = useState(false);
   const [failed, setFailed] = useState(false);
   const banner = bannerFailed ? null : bannerOf(h);
   const icon = iconOf(h);
-  // Without a banner: an icon image that turns out wide fills the card too.
+  // Without a banner: an icon image that turns out wide fills the artwork too.
   const [iconWide, setIconWide] = useState<boolean | null>(null);
   const wide = banner ? true : iconWide;
   const art = fallbackArt(h);
   const src = banner ?? (failed ? null : (icon?.src ?? null));
   const isLogo = !banner && !!icon?.logo;
+  const fade = { maskImage: "linear-gradient(180deg, #000 50%, transparent)", WebkitMaskImage: "linear-gradient(180deg, #000 50%, transparent)" };
   return (
     <motion.a
       href={`/h/${h.id}`}
-      onClick={linkTo(`/h/${h.id}`)} {...prefetchOn(h)}
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={spring}
+      onClick={linkTo(`/h/${h.id}`)}
+      {...prefetchOn(h)}
       whileTap={press}
-      className={cn("card mx-4 block overflow-hidden rounded-[26px]", className)}
+      className={cn("relative isolate flex flex-col overflow-hidden rounded-[28px] bg-[#0d0d12] text-white", rail ? "h-[372px]" : "h-[396px]")}
+      style={{ boxShadow: `0 24px 44px -26px ${tone}, inset 0 0 0 1px rgba(255,255,255,0.08)` }}
     >
-      <div className="relative h-[184px] overflow-hidden" style={{ background: src ? "var(--card-2)" : art.gradient }}>
+      {src && <img src={src} alt="" aria-hidden="true" className="absolute inset-0 -z-10 h-full w-full scale-150 object-cover opacity-40 blur-3xl saturate-150" />}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-10"
+        style={{ background: `radial-gradient(95% 50% at 12% 100%, ${tone}5c, transparent 70%), linear-gradient(180deg, rgba(13,13,18,0) 0%, rgba(13,13,18,0.5) 42%, rgba(13,13,18,0.94) 72%)` }}
+      />
+
+      <div className="relative min-h-0 flex-1">
         {src ? (
-          <>
-            {wide === false && <img src={src} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-125 object-cover opacity-70 blur-2xl saturate-150" />}
-            <img
-              src={src}
-              alt=""
-              onLoad={(e) => !banner && setIconWide(!isLogo && e.currentTarget.naturalWidth / e.currentTarget.naturalHeight > 1.35)}
-              onError={() => (banner ? setBannerFailed(true) : setFailed(true))}
-              className={cn(
-                wide === false
-                  ? cn(
-                      "absolute top-1/2 left-1/2 h-[128px] w-[128px] -translate-x-1/2 -translate-y-1/2 rounded-[28px] shadow-[0_12px_30px_-8px_rgba(0,0,0,0.45)]",
-                      isLogo ? "bg-white object-contain p-5" : "object-cover",
-                    )
-                  : "absolute inset-0 h-full w-full object-cover",
-                wide === null && "opacity-0",
-              )}
-            />
-          </>
+          <img
+            src={src}
+            alt=""
+            onLoad={(e) => !banner && setIconWide(!isLogo && e.currentTarget.naturalWidth / e.currentTarget.naturalHeight > 1.35)}
+            onError={() => (banner ? setBannerFailed(true) : setFailed(true))}
+            style={wide === false ? undefined : fade}
+            className={cn(
+              wide === false
+                ? cn(
+                    "absolute top-[46%] left-1/2 h-[104px] w-[104px] -translate-x-1/2 -translate-y-1/2 rounded-[26px] shadow-[0_16px_36px_-10px_rgba(0,0,0,0.7)]",
+                    isLogo ? "bg-white object-contain p-4" : "object-cover",
+                  )
+                : "absolute inset-0 h-full w-full object-cover",
+              wide === null && "opacity-0",
+            )}
+          />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-white">
-            <svg width="80" height="80" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
+          <div className="absolute inset-0 flex items-center justify-center text-white" style={{ background: art.gradient, ...fade }}>
+            <svg width="72" height="72" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
               <path d={art.glyph} />
             </svg>
           </div>
         )}
-        {spot && (
-          <span className="absolute top-3 left-3 flex h-7 max-w-[calc(100%-150px)] items-center gap-1.5 rounded-full bg-black/55 px-2.5 text-footnote font-semibold text-white backdrop-blur-xl">
-            <Icon name={spot.icon} size={13} filled />
-            <span className="truncate">{spot.label}</span>
-          </span>
-        )}
-        <span className={cn("absolute top-3 flex h-7 items-center gap-1.5 rounded-full bg-black/45 px-2.5 text-footnote font-semibold text-white backdrop-blur-xl", spot ? "right-3" : "left-3")}>
-          <Icon name="clock" size={12} stroke={2.8} />
-          {dueTag(h).text}
-        </span>
       </div>
-      <div className={cn("flex gap-3 px-4 pt-3.5 pb-4", stacked ? "flex-col gap-2" : "items-end")}>
-        <div className="min-w-0 flex-1">
-          <div className="line-clamp-2 text-title3 font-bold tracking-[-0.02em]">{h.title}</div>
-          <div className="mt-0.5 truncate text-subhead text-label-2">{meta(h)}</div>
-          {spot?.why && spot.key !== "prize" && spot.key !== "last" && (
-            <div className="mt-1 flex items-center gap-1 text-footnote font-semibold" style={{ color: spot.tone }}>
-              <Icon name={spot.icon} size={13} filled />
-              {spot.why}
+
+      <div className="relative px-[18px] pb-[18px]">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-black/80" style={{ background: tone, boxShadow: `0 0 22px -2px ${tone}` }}>
+            <Icon name={s.icon} size={18} filled />
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-[13px] leading-tight font-bold tracking-[0.06em] uppercase" style={{ color: tone }}>
+              {s.label}
             </div>
-          )}
+            {s.why && <div className="mt-0.5 truncate text-footnote text-white/75">{s.why}</div>}
+          </div>
         </div>
-        <div className={cn("shrink-0", !stacked && "text-right")}>
-          <div className="text-[calc(22px*var(--ts))] leading-tight font-bold tracking-[-0.025em] tabular">{prizeFull(h)}</div>
-          <div className="text-caption text-label-2">prize pool</div>
+        <div className="mt-3 line-clamp-2 text-title3 leading-tight font-bold tracking-[-0.02em]">{h.title}</div>
+        <div className="mt-1 truncate text-subhead text-white/60">{meta(h)}</div>
+        <div className="mt-3.5 flex items-end justify-between gap-3 border-t border-white/12 pt-3">
+          {(h.prize_usd ?? 0) > 0 ? (
+            <div className="min-w-0">
+              <div className="truncate text-[calc(22px*var(--ts))] leading-tight font-bold tracking-[-0.025em] tabular">{prizeFull(h)}</div>
+              <div className="text-caption text-white/55">prize pool</div>
+            </div>
+          ) : (
+            <div className="min-w-0 truncate pb-1 text-headline font-semibold text-white/85">{prizeFull(h)}</div>
+          )}
+          <span
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-footnote font-semibold"
+            style={s.key === "last" ? { background: tone, color: "#000" } : { background: "rgba(255,255,255,0.13)" }}
+          >
+            <Icon name="clock" size={12} stroke={2.8} />
+            {dueTag(h).text}
+          </span>
         </div>
       </div>
     </motion.a>
@@ -647,7 +653,8 @@ function RefreshButton() {
 
 /**
  * The spotlight carousel: swipe sideways through hackathons that stand out for different reasons.
- * The next card peeks in on a phone; dots (and arrows on a computer) show where you are.
+ * On a phone the neighbours peek in, dimmed; a counter, dots in each spotlight's colour (and arrows on
+ * a computer) show where you are.
  */
 function Spotlights({ spots, rail }: { spots: Spotlight[]; rail?: boolean }) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -655,9 +662,9 @@ function Spotlights({ spots, rail }: { spots: Spotlight[]; rail?: boolean }) {
   const slideAt = (i: number) => scroller.current?.children[i] as HTMLElement | undefined;
   const onScroll = () => {
     const el = scroller.current;
-    const first = slideAt(0);
-    if (!el || !first) return;
-    setAt(Math.max(0, Math.min(spots.length - 1, Math.round(el.scrollLeft / (first.offsetWidth + 12)))));
+    const [a, b] = [slideAt(0), slideAt(1)];
+    if (!el || !a || !b) return;
+    setAt(Math.max(0, Math.min(spots.length - 1, Math.round(el.scrollLeft / (b.offsetLeft - a.offsetLeft)))));
   };
   const go = (i: number) => {
     const el = scroller.current;
@@ -665,20 +672,41 @@ function Spotlights({ spots, rail }: { spots: Spotlight[]; rail?: boolean }) {
     if (el && slide) el.scrollTo({ left: slide.offsetLeft - (el.clientWidth - slide.offsetWidth) / 2, behavior: "smooth" });
   };
   return (
-    <div>
+    <section aria-label="Spotlight">
+      <div className={cn("flex items-end justify-between gap-3", rail ? "mb-2.5" : "mx-5 mt-8 mb-3")}>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1 text-footnote font-semibold text-label-2">
+            <Icon name="sparkle" size={13} filled className="text-tint" />
+            {spots.length} picks for today
+          </div>
+          <h2 className={cn("font-bold tracking-[-0.022em]", rail ? "text-headline" : "text-title2")}>Spotlight</h2>
+        </div>
+        {spots.length > 1 && (
+          <div className="mb-0.5 shrink-0 text-subhead font-semibold text-label-2 tabular" aria-hidden="true">
+            {at + 1} / {spots.length}
+          </div>
+        )}
+      </div>
       <div
         ref={scroller}
         onScroll={onScroll}
-        className={cn("no-scrollbar relative flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1", rail ? "" : "scroll-px-4 px-4")}
+        className={cn("no-scrollbar relative flex snap-x snap-mandatory overflow-x-auto pb-2", rail ? "gap-3" : "scroll-px-4 gap-2 px-4")}
       >
-        {spots.map((s) => (
-          <div key={s.key} className={cn("shrink-0 snap-center", rail ? "w-full" : "w-[calc(100%-36px)]")}>
-            <Hero h={s.h} spot={s} className="mx-0 h-full" stacked={rail} />
+        {spots.map((s, i) => (
+          <div
+            key={s.key}
+            className={cn(
+              "shrink-0 snap-center transition-[transform,opacity] duration-300 ease-out",
+              rail ? "w-full" : "w-[calc(100%-40px)]",
+              !rail && i !== at && "scale-[0.94] opacity-55",
+            )}
+          >
+            <SpotCard s={s} rail={rail} />
           </div>
         ))}
       </div>
       {spots.length > 1 && (
-        <div className="mt-2.5 flex items-center justify-center gap-1.5">
+        <div className="mt-2 flex items-center justify-center gap-1.5">
           {rail && (
             <button type="button" aria-label="Previous" disabled={at === 0} onClick={() => go(at - 1)} className="mr-1 flex h-7 w-7 items-center justify-center rounded-full bg-fill text-label disabled:opacity-35">
               <Icon name="back" size={13} stroke={2.8} />
@@ -693,7 +721,7 @@ function Spotlights({ spots, rail }: { spots: Spotlight[]; rail?: boolean }) {
               onClick={() => go(i)}
               className="flex h-5 items-center"
             >
-              <span className={cn("block h-1.5 rounded-full transition-all duration-300", i === at ? "w-4 bg-accent" : "w-1.5 bg-label-3")} />
+              <span className={cn("block h-1.5 rounded-full transition-all duration-300", i === at ? "w-5" : "w-1.5 bg-label-3")} style={i === at ? { background: s.tone } : undefined} />
             </button>
           ))}
           {rail && (
@@ -703,6 +731,6 @@ function Spotlights({ spots, rail }: { spots: Spotlight[]; rail?: boolean }) {
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }

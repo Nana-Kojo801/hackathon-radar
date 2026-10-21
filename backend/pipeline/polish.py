@@ -39,6 +39,7 @@ Rules:
 - Start with one or two plain sentences on what the hackathon is about. No heading before them.
 - Then use '### ' headings only where the text has distinct parts, chosen from: Tracks, What to build, Prizes, Eligibility, Judging, How to take part, Timeline, Resources, About the organizer. Skip parts the text doesn't cover.
 - Use '- ' bullets for lists. Bold sparingly with **...**.
+- Under Prizes, write each prize as a person would ("- **Best AI Agent** (AI Agents track): $1,000"), never as a list of fields like "Rank: 1" or "Amount: 1000".
 - Write links as [label](url). Turn bare URLs and emails into links.
 - Keep the original language.
 - At most about 350 words: cut repetition, never facts that matter for entering.
@@ -82,6 +83,34 @@ def _clean_markdown(md: str) -> str:
     return re.sub(r"\[([^\]]+)\]\((?!https?://|mailto:)[^)]*\)", r"\1", md)
 
 
+# A prize written out as its fields ("Rank: 1", "Amount Text: $1,000"): the model copying its own
+# structured answer into the text.
+FIELD_LINE = re.compile(r"^\s*(?:[-*]\s*)?(?:Track|Rank|Amount(?: USD| Text)?|Winners|Perks):", re.I | re.M)
+PRIZES_SECTION = re.compile(r"(^### Prizes[ \t]*\n)(.*?)(?=^### |\Z)", re.M | re.S)
+
+
+def _prize_line(p: dict) -> str:
+    name = f"**{p['name']}**" + (f" ({p['track']} track)" if p.get("track") and p["track"] not in p["name"] else "")
+    amount = p.get("amount_text") or (f"${p['amount_usd']:,.0f}" if p.get("amount_usd") else None)
+    extra = [amount] if amount else []
+    if p.get("winners", 1) > 1:
+        extra.append(f"{p['winners']} winners")
+    extra += p.get("perks") or []
+    return f"- {name}" + (f": {', '.join(extra)}" if extra else "")
+
+
+def _fix_prize_fields(md: str, prizes: list[dict]) -> str:
+    """Rewrite a Prizes section written as field lists from the prizes read alongside it."""
+    def fix(m: re.Match) -> str:
+        if len(FIELD_LINE.findall(m.group(2))) < 2:
+            return m.group(0)
+        if not prizes:
+            return ""
+        return m.group(1) + "\n".join(_prize_line(p) for p in prizes) + "\n\n"
+
+    return PRIZES_SECTION.sub(fix, md).strip()
+
+
 def _clean_prizes(prizes: list[dict]) -> list[dict]:
     out = []
     for p in prizes[:40]:
@@ -105,10 +134,11 @@ def polish_one(row: dict, usage: ai.Usage) -> dict:
     text = row["description"][:INPUT_LIMIT]
     user = f"Hackathon: {row['title']}\nOrganizer: {row.get('organizer') or 'unknown'}\n\nDescription:\n{text}"
     res = ai.chat_json(SYSTEM, user, SCHEMA, "polished_about", usage, max_tokens=1400)
-    md = _clean_markdown(res.get("markdown") or "")
+    prizes = _clean_prizes(res.get("prizes") or [])
+    md = _fix_prize_fields(_clean_markdown(res.get("markdown") or ""), prizes)
     if len(md) < 40:
         raise ValueError("markdown came back empty")
-    return {"markdown": md[:8000], "prizes": _clean_prizes(res.get("prizes") or [])}
+    return {"markdown": md[:8000], "prizes": prizes}
 
 
 def run_polish(conn, limit: int | None = None) -> dict:

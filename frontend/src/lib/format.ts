@@ -158,6 +158,14 @@ export function hostOf(url: string): string {
   }
 }
 
+/** The site's own name from a link: "hackathon.genai.works" is genai.works, "events.acm.org.uk" is acm.org.uk. */
+export function siteOf(url: string): string {
+  const parts = hostOf(url).split(".");
+  // Two-part endings like co.uk or com.gh keep one more part.
+  const keep = parts.length > 2 && /^(co|com|org|net|ac|edu|gov)$/.test(parts[parts.length - 2]) && parts[parts.length - 1].length === 2 ? 3 : 2;
+  return parts.slice(-keep).join(".");
+}
+
 /** Plain text from the light markdown some sources use. */
 export function cleanText(s: string | null | undefined): string {
   return (s ?? "")

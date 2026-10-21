@@ -104,3 +104,21 @@ def test_detail_endpoint_returns_polished_copy(conn, fake_ai, monkeypatch):
         body = client.get(f"/hackathons/{hid}").json()
     db.pool().close()
     assert body["about"].startswith("Build for Amazon devices.") and body["about_prizes"][0]["rank"] == 1
+
+
+def test_prizes_written_as_fields_are_rewritten():
+    from pipeline.polish import _fix_prize_fields
+
+    md = (
+        "A six-day hackathon.\n\n### Prizes\n- **Best AI Agent**  \n  Track: AI Agents  \n  Rank: 1  \n  Amount: 1000  \n"
+        "  Amount Text: $1,000  \n  Winners: 1  \n  Perks: None\n\n### Judging\n- Impact"
+    )
+    prizes = [{"name": "Best AI Agent", "track": "AI Agents", "rank": 1, "amount_usd": 1000, "amount_text": "$1,000", "winners": 1, "perks": []},
+              {"name": "Best Product", "track": None, "rank": None, "amount_usd": None, "amount_text": None, "winners": 2, "perks": ["Mentoring"]}]
+    assert _fix_prize_fields(md, prizes) == (
+        "A six-day hackathon.\n\n### Prizes\n- **Best AI Agent** (AI Agents track): $1,000\n"
+        "- **Best Product**: 2 winners, Mentoring\n\n### Judging\n- Impact"
+    )
+    # Written properly: left alone.
+    ok = "Intro.\n\n### Prizes\n- **Grand prize**: $5,000 (Track: Open)"
+    assert _fix_prize_fields(ok, prizes) == ok

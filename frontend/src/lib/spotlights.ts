@@ -14,7 +14,7 @@ export interface Spotlight {
   key: string;
   label: string;
   icon: IconName;
-  /** The label's colour. */
+  /** Its colour: bright enough for the card's dark backdrop in either theme. */
   tone: string;
   /** Why this one, in a few words ("61,282 registered"); null when the label says it all. */
   why: string | null;
@@ -40,11 +40,6 @@ export function forWomen(h: Hackathon): boolean {
 
 const text = (h: Hackathon) => `${h.title} ${h.summary ?? ""} ${h.prize_notes ?? ""}`;
 const has = (h: Hackathon, c: string) => h.categories.includes(c);
-
-function closes(h: Hackathon): string {
-  const d = daysLeft(h) ?? 0;
-  return d === 0 ? "Closes today" : d === 1 ? "Closes tomorrow" : `Closes in ${d} days`;
-}
 
 function money(n: number): string {
   return n >= 1000 ? `$${(n / 1000).toFixed(n >= 10_000 ? 0 : 1).replace(/\.0$/, "")}K` : `$${Math.round(n)}`;
@@ -100,12 +95,23 @@ export function spotlights(items: Hackathon[], exclude: Set<string>, todayStart:
   const place = (h: Hackathon) => h.location_text?.split(",").map((x) => x.trim()).filter(Boolean)[0] ?? null;
 
   const kinds: Kind[] = [
-    { key: "prize", label: "Biggest prize this week", icon: "trophy", tone: "var(--gold-fg)", core: true, match: within(0, 6), why: closes },
+    {
+      key: "prize",
+      label: "Biggest prize this week",
+      icon: "trophy",
+      tone: "#FFB020",
+      core: true,
+      match: within(0, 6),
+      why: () => {
+        const n = pool.filter(within(0, 6)).length;
+        return n > 1 ? `The biggest of ${n} closing this week` : null;
+      },
+    },
     {
       key: "popular",
       label: "Most popular",
       icon: "users",
-      tone: "var(--orange)",
+      tone: "#FF7A1A",
       core: true,
       match: (h) => (h.registrations ?? 0) >= 100,
       score: (h) => h.registrations ?? 0,
@@ -115,7 +121,7 @@ export function spotlights(items: Hackathon[], exclude: Set<string>, todayStart:
       key: "fresh",
       label: "Biggest new find",
       icon: "sparkle",
-      tone: "var(--tint)",
+      tone: "#0A84FF",
       core: true,
       match: (h) => Date.parse(h.first_seen_at) >= todayStart - 2 * DAY,
       why: (h) => {
@@ -123,45 +129,45 @@ export function spotlights(items: Hackathon[], exclude: Set<string>, todayStart:
         return seen >= todayStart ? "Found today" : seen >= todayStart - DAY ? "Found yesterday" : `Found ${weekday(h.first_seen_at)}`;
       },
     },
-    { key: "last", label: "Last chance", icon: "clock", tone: "var(--red)", core: true, match: within(0, 2), why: closes },
-    { key: "women", label: "For women in tech", icon: "female", tone: "#D6336C", core: true, match: forWomen },
+    { key: "last", label: "Last chance", icon: "clock", tone: "#FF453A", core: true, match: within(0, 2) },
+    { key: "women", label: "For women in tech", icon: "female", tone: "#FF4F8B", core: true, match: forWomen },
     {
       // Prize money per person registered: where a good result is most within reach.
       key: "odds",
       label: "Best odds",
       icon: "target",
-      tone: "var(--green)",
+      tone: "#30D158",
       match: (h) => (h.registrations ?? 0) >= 10 && (h.prize_usd ?? 0) >= 500,
       score: (h) => (h.prize_usd ?? 0) / (h.registrations ?? 1),
       why: (h) => `${money((h.prize_usd ?? 0) / (h.registrations ?? 1))} in prizes per person registered`,
     },
-    { key: "students", label: "For students", icon: "student", tone: "#5856D6", match: (h) => h.student_only === true, why: () => "Students only" },
-    { key: "beginners", label: "Beginner friendly", icon: "plant", tone: "var(--green)", match: (h) => BEGINNER.test(text(h)) },
+    { key: "students", label: "For students", icon: "student", tone: "#7D7AFF", match: (h) => h.student_only === true, why: () => "Students only" },
+    { key: "beginners", label: "Beginner friendly", icon: "plant", tone: "#34C759", match: (h) => BEGINNER.test(text(h)) },
     {
       key: "bigtech",
       label: "Backed by big tech",
       icon: "buildings",
-      tone: "#0A84FF",
+      tone: "#64D2FF",
       match: (h) => BIG_TECH.test(h.organizer ?? "") || BIG_TECH.test(h.title),
       why: (h) => (h.organizer ? `By ${h.organizer}` : null),
     },
-    { key: "career", label: "Could lead to a job", icon: "briefcase", tone: "#8E5E3C", match: (h) => CAREER.test(text(h)), why: () => "Internships, interviews or job offers" },
-    { key: "ai", label: "For AI builders", icon: "cpu", tone: "#7B3FFF", match: (h) => has(h, "AI/ML") },
-    { key: "web3", label: "Web3 and crypto", icon: "cube", tone: "#E8A33D", match: (h) => has(h, "web3/blockchain") },
-    { key: "climate", label: "Climate and impact", icon: "leaf", tone: "#1B9E5A", match: (h) => has(h, "climate") },
-    { key: "health", label: "Health tech", icon: "heartbeat", tone: "#E5484D", match: (h) => has(h, "health") },
-    { key: "games", label: "Game jam", icon: "game", tone: "#AF52DE", match: (h) => has(h, "gaming") },
-    { key: "security", label: "Security and CTF", icon: "shield", tone: "#30A46C", match: (h) => has(h, "cybersecurity") || CTF.test(h.title) },
-    { key: "hardware", label: "Hardware and robotics", icon: "robot", tone: "#6E56CF", match: (h) => has(h, "hardware/IoT") || has(h, "robotics") },
-    { key: "fintech", label: "Fintech", icon: "chart", tone: "#12A594", match: (h) => has(h, "fintech") },
-    { key: "education", label: "Edtech", icon: "news", tone: "#3E63DD", match: (h) => has(h, "education") },
-    { key: "inperson", label: "Meet in person", icon: "pin", tone: "#F76B15", match: (h) => h.format === "in_person" && !!place(h), why: (h) => place(h) },
-    { key: "anywhere", label: "Join from anywhere", icon: "globe", tone: "var(--green)", match: (h) => h.format === "online" && h.international_ok === true, why: () => "Online and open worldwide" },
+    { key: "career", label: "Could lead to a job", icon: "briefcase", tone: "#D29A5E", match: (h) => CAREER.test(text(h)), why: () => "Internships, interviews or job offers" },
+    { key: "ai", label: "For AI builders", icon: "cpu", tone: "#A879FF", match: (h) => has(h, "AI/ML") },
+    { key: "web3", label: "Web3 and crypto", icon: "cube", tone: "#F7B32B", match: (h) => has(h, "web3/blockchain") },
+    { key: "climate", label: "Climate and impact", icon: "leaf", tone: "#2FBF71", match: (h) => has(h, "climate") },
+    { key: "health", label: "Health tech", icon: "heartbeat", tone: "#FF5A5F", match: (h) => has(h, "health") },
+    { key: "games", label: "Game jam", icon: "game", tone: "#BF5AF2", match: (h) => has(h, "gaming") },
+    { key: "security", label: "Security and CTF", icon: "shield", tone: "#30C48D", match: (h) => has(h, "cybersecurity") || CTF.test(h.title) },
+    { key: "hardware", label: "Hardware and robotics", icon: "robot", tone: "#8E7CFF", match: (h) => has(h, "hardware/IoT") || has(h, "robotics") },
+    { key: "fintech", label: "Fintech", icon: "chart", tone: "#19C3B0", match: (h) => has(h, "fintech") },
+    { key: "education", label: "Edtech", icon: "news", tone: "#5E8BFF", match: (h) => has(h, "education") },
+    { key: "inperson", label: "Meet in person", icon: "pin", tone: "#FF9F0A", match: (h) => h.format === "in_person" && !!place(h), why: (h) => place(h) },
+    { key: "anywhere", label: "Join from anywhere", icon: "globe", tone: "#32D74B", match: (h) => h.format === "online" && h.international_ok === true, why: () => "Online and open worldwide" },
     {
       key: "weekend",
       label: "This weekend",
       icon: "calendar",
-      tone: "#0091FF",
+      tone: "#40A9FF",
       match: (h) => !!h.start_date && Date.parse(h.start_date) >= Math.max(satStart, now - DAY) && Date.parse(h.start_date) < monStart,
       why: (h) => `Starts ${weekdayDate(h.start_date)}`,
     },
@@ -169,7 +175,7 @@ export function spotlights(items: Hackathon[], exclude: Set<string>, todayStart:
       key: "sprint",
       label: "Short sprint",
       icon: "lightning",
-      tone: "#AF52DE",
+      tone: "#FFD60A",
       match: (h) => {
         const s = span(h);
         const start = h.start_date ? Date.parse(h.start_date) : 0;
@@ -181,7 +187,7 @@ export function spotlights(items: Hackathon[], exclude: Set<string>, todayStart:
       key: "marathon",
       label: "Take your time",
       icon: "hourglass",
-      tone: "#8E8E93",
+      tone: "#AEAEB2",
       match: (h) => (span(h) ?? 0) >= 28 * DAY && (!h.end_date || Date.parse(h.end_date) > now + 14 * DAY),
       why: (h) => `${Math.round((span(h) ?? 0) / (7 * DAY))} weeks · ends ${weekdayDate(h.end_date)}`,
     },
