@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { type ReactNode, useMemo, useRef, useState } from "react";
+import { memo, type ReactNode, useMemo, useRef, useState } from "react";
 
 import { Icon, type IconName } from "../components/Icon";
 import { Banner, CompactBar, Cover, DeskHeader, DueTag, GlassButton, LargeTitle, PrimaryButton, SectionHeader, StageTag, Thumb, useScrolled } from "../components/kit";
@@ -312,7 +312,7 @@ function DeadlineCard({ h, status, days, index }: { h: Hackathon; status: Stage;
  * One spotlight, on a dark stage lit in its colour: the artwork, then why it's here (the label and a
  * line on why) before the hackathon itself, so a long title never hides the reason.
  */
-function SpotCard({ s, rail }: { s: Spotlight; rail?: boolean }) {
+const SpotCard = memo(function SpotCard({ s, rail }: { s: Spotlight; rail?: boolean }) {
   const { h, tone } = s;
   const [bannerFailed, setBannerFailed] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -402,7 +402,7 @@ function SpotCard({ s, rail }: { s: Spotlight; rail?: boolean }) {
       </div>
     </motion.a>
   );
-}
+});
 
 function CompactRow({ h, index, last, stage }: { h: Hackathon; index: number; last: boolean; stage: Stage | null }) {
   return (
@@ -692,14 +692,10 @@ function Spotlights({ spots, rail }: { spots: Spotlight[]; rail?: boolean }) {
         onScroll={onScroll}
         className={cn("no-scrollbar relative flex snap-x snap-mandatory overflow-x-auto pb-2", rail ? "gap-3" : "scroll-px-4 gap-2 px-4")}
       >
-        {spots.map((s, i) => (
+        {spots.map((s) => (
           <div
             key={s.key}
-            className={cn(
-              "shrink-0 snap-center transition-[transform,opacity] duration-300 ease-out",
-              rail ? "w-full" : "w-[calc(100%-40px)]",
-              !rail && i !== at && "scale-[0.94] opacity-55",
-            )}
+            className={cn("shrink-0 snap-center", rail ? "w-full" : "spot-slide w-[calc(100%-40px)] will-change-transform")}
           >
             <SpotCard s={s} rail={rail} />
           </div>
