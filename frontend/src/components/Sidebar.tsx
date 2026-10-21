@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 
+import { openAdd } from "../lib/add";
 import { SIDEBAR_W } from "../lib/desktop";
 import { applyFilters, DEFAULT_FILTERS, type Filters } from "../lib/filters";
 import { usePersonal } from "../lib/personal";
@@ -108,6 +109,11 @@ export function Sidebar({ route, badge }: { route: Route; badge: number }) {
           Stats
         </Item>
       </nav>
+
+      <button type="button" onClick={() => openAdd()} className={cn(itemClass(false), "mt-0.5 text-left")}>
+        <Icon name="plus" size={20} className="shrink-0 text-tint" />
+        Add a hackathon
+      </button>
 
       <h2 className="px-2.5 pt-5 pb-1.5 text-[11px] font-semibold tracking-[0.06em] text-label-2 uppercase">Shortcuts</h2>
       <div className="flex flex-col gap-0.5">

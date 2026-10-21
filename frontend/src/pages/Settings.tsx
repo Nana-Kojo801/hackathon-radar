@@ -101,8 +101,13 @@ export function SettingsTab() {
       {p.key && <RefreshCard />}
 
       <Group header="Data" footer="Listings refresh every 6 hours from Devpost, Devfolio, MLH, TAIKAI, ETHGlobal, Unstop and the web.">
-        <RowLink icon="refresh" iconBg="#8E8E93" label="Last refresh" value={timeAgo(d.meta?.last_refresh)} chevron={false} />
-        <NextRefresh last={d.meta?.last_refresh} />
+        {/* A connected device sees the live run in the Search card above instead. */}
+        {!p.key && (
+          <>
+            <RowLink icon="refresh" iconBg="#8E8E93" label="Last refresh" value={timeAgo(d.meta?.last_refresh)} chevron={false} />
+            <NextRefresh last={d.meta?.last_refresh} />
+          </>
+        )}
         <RowLink icon={failing ? "alert" : "check"} iconBg={failing ? "#FF9500" : "#8E8E93"} label="Sources" hint={failing?.text} value={failing ? undefined : "All healthy"} chevron={false} />
       </Group>
 
@@ -224,8 +229,8 @@ function NextRefresh({ last }: { last: string | null | undefined }) {
       icon="clock"
       iconBg="#007AFF"
       label="Next refresh"
-      hint={next.due ? "Running now. GitHub sometimes starts it a little late." : `Around ${at}`}
-      value={next.due ? "Any minute" : <span className="tabular">{countdown(next.at - now)}</span>}
+      hint={next.due ? "Due now. GitHub often starts scheduled runs late." : `Around ${at}`}
+      value={next.due ? "Due" : <span className="tabular">{countdown(next.at - now)}</span>}
       chevron={false}
     />
   );

@@ -92,6 +92,7 @@ def new_matches(cur, s: dict, since: datetime, until: datetime, limit: int = 25)
           AND (registration_deadline IS NULL OR registration_deadline > %(until)s)
           AND {VISIBLE_SINCE} > %(since)s AND {VISIBLE_SINCE} <= %(until)s
           AND NOT EXISTS (SELECT 1 FROM my_hackathons m WHERE m.hackathon_id = h.id AND m.status = 'hidden')
+          AND NOT h.added_by_user
         ORDER BY prize_usd DESC NULLS LAST, registration_deadline NULLS LAST
         LIMIT %(limit)s
         """,
@@ -369,6 +370,7 @@ def big_prizes(cur, s: dict, since: datetime, until: datetime, exclude: list) ->
           AND {VISIBLE_SINCE} > %(since)s AND {VISIBLE_SINCE} <= %(until)s
           AND NOT (id = ANY(%(exclude)s::uuid[]))
           AND NOT EXISTS (SELECT 1 FROM my_hackathons m WHERE m.hackathon_id = h.id AND m.status = 'hidden')
+          AND NOT h.added_by_user
         ORDER BY prize_usd DESC LIMIT 3
         """,
         {"min": s["big_prize_min"], "since": since, "until": until, "exclude": exclude, "vetted": VETTED_SOURCES},

@@ -187,3 +187,20 @@ A small static FX table (`normalize.FX_TO_USD`) converts INR/EUR/CAD/etc. right 
 - **Saved is a board** with a column per stage (Saved, Registered, Submitted, Results). Moving a hackathon on is one drag; the Results column splits into Won and Didn't place while you drag. Hidden hackathons are one button away.
 - **Settings opens its pages beside the list** (Appearance by default) rather than pushing them over it: the same pages, rendered without their own back bar (`InlinePage` in `components/OverlayPage.tsx`).
 - **A hackathon's page** has its banner as a rounded card across the top, the register button in the header instead of a floating bar, the facts in a row of four, and a right column with your progress, a timeline of its dates, Claude and Not interested.
+
+## Adding a hackathon by hand
+
+- **The radar's own tools, run on request.** Adding uses what web discovery already uses (Tavily, the page reader, OpenAI), on the API server (`app/add.py`), behind the personal key so only your devices spend the AI credit. A link is read directly (with Tavily's extract as a fallback for pages built in the browser); a name, or a social post, is searched for. LinkedIn posts rarely open without a login, so the words in the post's link (`/posts/hackerrank_openai-hackathon-activity-…`) become the search.
+- **You confirm before anything is stored,** with up to three candidates to pick from and every field editable. The AI is told to leave anything the pages don't state empty and to use only links that appear on them; social links and made-up URLs are dropped.
+- **Stored as a web find, marked `added_by_user`** (migration 013), so dedupe, artwork, the snapshot and a later merge with a platform listing all work as for any listing. Unlike other web finds it shows before the AI has vetted it, the vetting never hides it, and it never triggers an alert (you added it). It's visible in Explore for everyone, like any listing, labelled **Added by you**.
+- **It shows at once:** the app adds it to its list and opens its page (read from the API until the snapshot has it), saves it, and the server republishes the snapshot after filling in the summary and artwork.
+- **Sharing from another app** uses the web app manifest's `share_target`: the installed app appears in Android's share sheet and opens at `/add`.
+
+## Refresh status that tells the truth
+
+- The list is loaded once, so "last refreshed" and "next refresh" went stale: after a scheduled time passed, Settings kept saying a run was starting, even after it had finished. The app now checks the snapshot when it comes back to the screen and every few minutes, and reloads when a newer one is out.
+- The Search card in Settings uses the server's live record of runs. Scheduled runs show their steps like manual ones. When a scheduled time passes and GitHub hasn't started the run yet (it often starts them late), the card says it's waiting for it, instead of claiming it's running. The duplicate Last/Next refresh rows only show on a device that isn't connected.
+
+## No flicker after a hackathon's page slides in
+
+- The page used to fetch its details and banner only once it appeared, so they landed just after the slide: content appeared, and the banner header resized to the image's shape, moving the whole page. Now a touch on a hackathon starts loading both (`lib/prefetch.ts`), the header's height is fixed from the start (the banner's shape when known, else the usual 1.91:1), and the banner fades in if it's late. The header and facts no longer play their own entrance animation on top of the slide.

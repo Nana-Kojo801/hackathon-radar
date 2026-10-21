@@ -3,14 +3,16 @@ import { useMemo, useState } from "react";
 
 import { HackRow } from "../components/HackRow";
 import { Icon } from "../components/Icon";
-import { CompactBar, DeskHeader, DueTag, EmptyState, LargeTitle, PrimaryButton, Segmented, StageTag, Thumb, useScrolled } from "../components/kit";
+import { CompactBar, DeskHeader, DueTag, EmptyState, GlassButton, LargeTitle, PrimaryButton, Segmented, StageTag, Thumb, useScrolled } from "../components/kit";
 import type { Hackathon } from "../lib/api";
 import { meta } from "../components/HackRow";
 import { useAppearance } from "../lib/appearance";
+import { openAdd } from "../lib/add";
 import { useDesktop } from "../lib/desktop";
 import { daysLeft, prizeFull, prizeShort, timeAgo, weekdayDate } from "../lib/format";
 import { press, rise, spring } from "../lib/motion";
 import { type Stage, type Tracked, track, usePersonal } from "../lib/personal";
+import { prefetchOn } from "../lib/prefetch";
 import { linkTo } from "../lib/router";
 import { useData } from "../lib/store";
 import { toast } from "../lib/toast";
@@ -121,6 +123,15 @@ export function Saved() {
           title={showHidden ? "Hidden" : "Saved"}
           subtitle={showHidden ? "Hackathons you marked Not interested" : statusLine}
           accessory={
+            <>
+            <button
+              type="button"
+              onClick={() => openAdd()}
+              className="flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-subhead font-semibold text-on-accent hover:brightness-110"
+            >
+              <Icon name="plus" size={17} stroke={2.6} />
+              Add a hackathon
+            </button>
             <button
               type="button"
               aria-pressed={showHidden}
@@ -131,6 +142,7 @@ export function Saved() {
               {showHidden ? "Back to the board" : "Hidden"}
               {!showHidden && <span className="text-label-2 tabular">{groups.hidden.length}</span>}
             </button>
+            </>
           }
         />
         {!p.key && (
@@ -165,7 +177,7 @@ export function Saved() {
   return (
     <div className="pb-32">
       <CompactBar title="Saved" show={scrolled} />
-      <LargeTitle title="Saved" subtitle={statusLine} />
+      <LargeTitle title="Saved" subtitle={statusLine} accessory={<GlassButton label="Add a hackathon" icon="plus" size={40} onClick={() => openAdd()} />} />
 
       {!p.key && (
         <a href="/settings" onClick={linkTo("/settings")} className="mx-4 mt-4 flex items-center gap-3 rounded-[18px] bg-soft px-4 py-3">
@@ -256,7 +268,7 @@ function SoonCard({ e, index }: { e: Entry; index: number }) {
   const used = Math.min(1, Math.max(0.06, 1 - days / 14));
   const urgent = days <= 1;
   return (
-    <motion.a href={`/h/${h.id}`} onClick={linkTo(`/h/${h.id}`)} {...rise(index, 4)} whileTap={press} className="card block rounded-[22px] p-4 pl-3.5">
+    <motion.a href={`/h/${h.id}`} onClick={linkTo(`/h/${h.id}`)} {...prefetchOn(h)} {...rise(index, 4)} whileTap={press} className="card block rounded-[22px] p-4 pl-3.5">
       <div className="flex items-center gap-3">
         <Thumb h={h} size={52} radius={13} />
         <div className="min-w-0 flex-1">
@@ -291,11 +303,11 @@ function SoonCard({ e, index }: { e: Entry; index: number }) {
 function HiddenRow({ e, index, last }: { e: Entry; index: number; last: boolean }) {
   return (
     <motion.li {...rise(index)} className="flex items-center gap-3 pl-3.5">
-      <a href={`/h/${e.h.id}`} onClick={linkTo(`/h/${e.h.id}`)} className="shrink-0 opacity-70">
+      <a href={`/h/${e.h.id}`} onClick={linkTo(`/h/${e.h.id}`)} {...prefetchOn(e.h)} className="shrink-0 opacity-70">
         <Thumb h={e.h} size={48} radius={12} />
       </a>
       <div className={cn("flex min-h-[70px] min-w-0 flex-1 items-center gap-2.5 py-2.5 pr-3", !last && "border-b hairline")}>
-        <a href={`/h/${e.h.id}`} onClick={linkTo(`/h/${e.h.id}`)} className="min-w-0 flex-1">
+        <a href={`/h/${e.h.id}`} onClick={linkTo(`/h/${e.h.id}`)} {...prefetchOn(e.h)} className="min-w-0 flex-1">
           <div className="truncate text-callout font-semibold text-label-2">{e.h.title}</div>
           <div className="mt-1 flex items-center gap-1.5">
             <DueTag h={e.h} />
@@ -447,7 +459,7 @@ function BoardCard({ e, dragging, onDrag, onDragEnd }: { e: Entry; dragging: boo
   return (
     <a
       href={`/h/${h.id}`}
-      onClick={linkTo(`/h/${h.id}`)}
+      onClick={linkTo(`/h/${h.id}`)} {...prefetchOn(h)}
       draggable
       onDragStart={(ev) => {
         ev.dataTransfer.setData("text/plain", e.id);

@@ -37,9 +37,9 @@ DECISIONS.md      choices that differ from (or fill gaps in) the spec
 | Variable | Where | Notes |
 |---|---|---|
 | `DATABASE_URL` | Render, GitHub secret, local `.env` | Neon **direct** (non-pooled) connection string, including `?sslmode=require` |
-| `OPENAI_API_KEY` | GitHub secret (Render too if you use `/admin/refresh`) | the only paid service |
+| `OPENAI_API_KEY` | GitHub secret, and Render (for **Add a hackathon**) | the only paid service |
 | `OPENAI_MODEL` | optional | default `gpt-4o-mini`. `gpt-4.1-nano` or `gpt-5-nano` also work |
-| `SEARCH_API_KEY` | GitHub secret (Render too if you use `/admin/refresh`) | [Tavily](https://tavily.com) key, free tier is 1,000 searches/month |
+| `SEARCH_API_KEY` | GitHub secret, and Render (for **Add a hackathon**) | [Tavily](https://tavily.com) key, free tier is 1,000 searches/month |
 | `ADMIN_TOKEN` | Render | protects `POST /admin/refresh` |
 | `PERSONAL_KEY` | Render | unlocks your personal data (saved hackathons, notes, email settings); each device enters it once in Settings. Falls back to `ADMIN_TOKEN` if unset |
 | `RESEND_API_KEY` | GitHub secret | [Resend](https://resend.com) API key, for the email alerts |
@@ -168,6 +168,7 @@ The app is for one person, so there are no accounts. Your personal data lives in
 - **Track hackathons:** swipe a row left and tap **Save**, or use the bookmark on a hackathon's page; set its stage and keep a note there. **Hide** (or **Not interested**) takes it out of every list; it waits under Saved › Hidden. Saving works before the device is connected too: it's kept on the device and syncs once you connect. Changes show at once and sync in the background, since the free API can take a minute to wake.
 - **Ask Claude for ideas:** **Brainstorm ideas with Claude** opens Claude with a brief that has everything known about the hackathon (dates, prizes, themes, rules, the organizer's description), or copies it. Claude's `?q=` prefill isn't documented, so the prompt is copied either way.
 - **Share** sends the hackathon's own page (Devpost, Devfolio, ...), not this app's link.
+- **Add a hackathon the radar hasn't found:** paste its link or type its name (the **+** on Saved, **Add a hackathon** in the desktop sidebar, or **Find it with AI** when a search in Explore comes up empty). On an Android phone with the app installed, share a post (LinkedIn, X, ...) to **Hack Radar** to start there. The server reads the link, or searches the web with Tavily when there's only a name or a social post, and the AI picks out the details. You check them (anything the pages don't say is left empty, never guessed), and **Add and save** puts it in Explore, marked **Added by you**, and on your Saved list. In the background the AI adds its summary, prize and themes, the artwork step looks for a banner and logo, and the public snapshot is republished. If it's already on the radar, you're taken to it instead. Needs `OPENAI_API_KEY` and `SEARCH_API_KEY` on Render; about a cent per add at most.
 - **Badge:** the installed app's icon shows how many saved hackathons close this week (Settings › Notifications › Badge on app icon).
 - **Stats** (Settings › Your stats, or **Your week** at the bottom of Today): **You** shows the share of listed hackathons you register for, your funnel from opened to won, win rate, month by month, how often and when you open the app, whether emails, notifications or the Home Screen bring you back, how long you take to register, the themes and formats you lean towards, and the prize pools you go for. **Market** shows open prize money, new hackathons per week, a calendar of deadlines ahead, prize sizes, themes, platforms and the radar's own health. Activity is counted from when the stats page shipped; stage history from before that was rebuilt from when each hackathon was first saved.
 
@@ -209,7 +210,7 @@ The free Render API sleeps after 15 minutes idle and takes 30-60 seconds to wake
 - `GET /meta`: category counts, last refresh time, and the latest run per source with fetched/new/errors/tokens.
 - `GET /push/key`: the public key for push subscriptions (null when push isn't set up).
 - `GET /stats`: market numbers for the stats page (also in the snapshot as `stats.json`).
-- `/me/...` (needs `X-Personal-Key`): `GET /me`, `PUT /me/hackathons/{id}`, `PUT /me/settings`, `POST`/`DELETE /me/push` (this device's push subscription), `POST /me/push/test`, `GET /me/stats` and `POST /me/events` (app opens and hackathons viewed, for the stats page).
+- `/me/...` (needs `X-Personal-Key`): `GET /me`, `PUT /me/hackathons/{id}`, `PUT /me/settings`, `POST /me/add/find` and `POST /me/add` (add a hackathon), `POST`/`DELETE /me/push` (this device's push subscription), `POST /me/push/test`, `GET /me/stats` and `POST /me/events` (app opens and hackathons viewed, for the stats page).
 - `POST /admin/refresh`: needs the `X-Admin-Token` header.
 - `GET /health`
 

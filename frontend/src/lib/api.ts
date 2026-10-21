@@ -46,6 +46,8 @@ export interface Hackathon {
   first_seen_at: string;
   last_seen_at: string;
   enriched: boolean;
+  /** You added it yourself (Add a hackathon), rather than the radar finding it. */
+  added_by_user?: boolean;
 }
 
 export interface Prize {

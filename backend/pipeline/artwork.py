@@ -309,7 +309,8 @@ def find_artwork(http: PoliteClient, row: dict, org_domain: str | None) -> dict:
     return {"page_image_url": banner, "logo_url": logo or site_icon}
 
 
-def run_artwork(conn, limit: int | None = None) -> dict:
+def run_artwork(conn, limit: int | None = None, ids: list | None = None) -> dict:
+    """Artwork for the listings missing it; or right away for `ids` (a hackathon you just added)."""
     limit = MAX_ARTWORK_PER_RUN if limit is None else limit
     stats = {"candidates": 0, "covers": 0, "logos": 0, "tokens_used": 0}
     with conn.cursor() as cur:
@@ -325,11 +326,13 @@ def run_artwork(conn, limit: int | None = None) -> dict:
               WHERE NOT is_hidden AND status IN ('open', 'upcoming') AND artwork_attempts < %s
             ) c
             WHERE (want_banner OR want_icon)
-              AND (artwork_checked_at IS NULL OR artwork_checked_at < now() - interval '7 days')
+              AND (CASE WHEN %s::uuid[] IS NULL
+                        THEN artwork_checked_at IS NULL OR artwork_checked_at < now() - interval '7 days'
+                        ELSE id = ANY(%s::uuid[]) END)
             ORDER BY artwork_checked_at NULLS FIRST, prize_usd DESC NULLS LAST
             LIMIT %s
             """,
-            (MAX_ATTEMPTS, limit),
+            (MAX_ATTEMPTS, ids, ids, limit),
         )
         rows = cur.fetchall()
         usage = ai.Usage()

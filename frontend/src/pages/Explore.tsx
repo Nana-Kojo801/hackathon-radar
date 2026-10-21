@@ -5,6 +5,7 @@ import { HackRow } from "../components/HackRow";
 import { Icon } from "../components/Icon";
 import { Chip, CompactBar, DeskHeader, EmptyState, GlassButton, Group, LargeTitle, Menu, PrimaryButton, RowMenu, RowToggle, Segmented, Sheet, TabActiveContext, useScrolled } from "../components/kit";
 import { Preview } from "./Detail";
+import { openAdd } from "../lib/add";
 import { useAppearance } from "../lib/appearance";
 import { useDesktop } from "../lib/desktop";
 import {
@@ -115,11 +116,19 @@ export function Explore() {
       <EmptyState
         icon="search"
         title="No matches"
-        text={f.q ? `Nothing matches “${f.q}” with these filters.` : "No hackathons match these filters."}
+        text={f.q ? `Nothing matches “${f.q}” with these filters. If the radar hasn't found it, the AI can look it up and add it.` : "No hackathons match these filters."}
         action={
-          <PrimaryButton tone="fill" onClick={() => d.setFilters({ ...DEFAULT_FILTERS, sort: f.sort })}>
-            Clear filters
-          </PrimaryButton>
+          <div className="flex flex-wrap justify-center gap-2.5">
+            {f.q.trim().length >= 2 && (
+              <PrimaryButton onClick={() => openAdd(f.q)}>
+                <Icon name="sparkle" size={18} filled />
+                Find it with AI
+              </PrimaryButton>
+            )}
+            <PrimaryButton tone="fill" onClick={() => d.setFilters({ ...DEFAULT_FILTERS, sort: f.sort })}>
+              Clear filters
+            </PrimaryButton>
+          </div>
         }
       />
     ) : (
@@ -177,6 +186,7 @@ export function Explore() {
           </div>
           {listBody}
           {rows.length < results.length && <div ref={sentinel} className="h-px" />}
+          {f.q.trim().length >= 2 && results.length > 0 && rows.length >= results.length && <NotHere q={f.q} />}
           {pane && results.length > 0 && <p className="mt-4 text-center text-footnote text-label-2">Use ↑ and ↓ to move through the list, and Enter to open a hackathon.</p>}
         </div>
         {pane && (
@@ -298,9 +308,20 @@ export function Explore() {
       {rows.length > 0 && rows.length >= results.length && results.length > 8 && (
         <p className="mt-5 text-center text-footnote text-label-2">That's all {results.length}. Swipe left on a row to save or hide it.</p>
       )}
+      {f.q.trim().length >= 2 && results.length > 0 && rows.length >= results.length && <NotHere q={f.q} />}
 
       <FilterSheet open={sheet} onOpenChange={setSheet} count={results.length} />
     </div>
+  );
+}
+
+/** Under search results: the one you're after may be one the radar hasn't found. */
+function NotHere({ q }: { q: string }) {
+  return (
+    <button type="button" onClick={() => openAdd(q)} className="mx-auto mt-5 flex items-center gap-1.5 text-subhead font-medium text-tint hover:underline">
+      <Icon name="sparkle" size={15} filled />
+      Not here? Find “{q.trim()}” with AI and add it
+    </button>
   );
 }
 

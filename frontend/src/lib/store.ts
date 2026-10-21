@@ -20,6 +20,8 @@ export interface AppData {
   newSince: string | null;
   categories: { category: string; count: number }[];
   warning: { key: string; text: string } | null;
+  /** Show a hackathon you just added before the published list has it. */
+  addLocal: (h: Hackathon) => void;
 }
 
 export const DataContext = createContext<AppData | null>(null);
@@ -41,4 +43,10 @@ export function takeSearchFocus(): boolean {
   const v = focusSearch;
   focusSearch = false;
   return v;
+}
+
+/** Ask App to check for a newer list (a refresh just finished); it reloads only if there is one. */
+export const DATA_STALE_EVENT = "radar:data-stale";
+export function checkForNewData(): void {
+  window.dispatchEvent(new Event(DATA_STALE_EVENT));
 }

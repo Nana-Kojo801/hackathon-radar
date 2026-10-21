@@ -11,7 +11,7 @@
  * It also shows push notifications sent by the server (backend/app/push.py)
  * and opens the right page when one is tapped.
  */
-const VERSION = "v4";
+const VERSION = "v5";
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
 const DATA = `data-${VERSION}`;

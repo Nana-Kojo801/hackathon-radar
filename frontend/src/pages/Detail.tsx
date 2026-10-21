@@ -5,7 +5,7 @@ import { ClaudeMark, Icon, type IconName } from "../components/Icon";
 import { Cover, GlassButton, Menu, StageTag, Thumb } from "../components/kit";
 import { OverlayPage } from "../components/OverlayPage";
 import { fromPlatform, Prizes } from "../components/Prizes";
-import { fetchData, type Hackathon, type HackathonDetail } from "../lib/api";
+import type { Hackathon, HackathonDetail } from "../lib/api";
 import { calendarEvents, downloadIcs, googleCalendarUrl } from "../lib/calendar";
 import {
   bannerOf,
@@ -25,6 +25,7 @@ import {
 } from "../lib/format";
 import { useDesktop } from "../lib/desktop";
 import { bouncy, press, spring } from "../lib/motion";
+import { bannerRatio, loadDetail, rememberRatio } from "../lib/prefetch";
 import { claudeUrl, ideasPrompt } from "../lib/prompt";
 import { parseBlocks, RichText } from "../lib/richtext";
 import { type Stage, track, usePersonal } from "../lib/personal";
@@ -48,8 +49,8 @@ export function Detail({ id, initial }: { id: string; initial?: Hackathon }) {
     const ctrl = new AbortController();
     setDetail(null);
     setError(null);
-    fetchData<HackathonDetail>(`h/${id}.json`, `/hackathons/${id}`, ctrl.signal)
-      .then(setDetail)
+    loadDetail(id)
+      .then((d) => !ctrl.signal.aborted && setDetail(d))
       .catch((e) => !ctrl.signal.aborted && setError(e instanceof Error ? e.message : String(e)));
     return () => ctrl.abort();
   }, [id]);
@@ -92,8 +93,13 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
   const days = daysLeft(h);
   const [bannerFailed, setBannerFailed] = useState(false);
   const banner = bannerFailed ? null : bannerOf(h);
-  const [bannerRatio, setBannerRatio] = useState(1.91);
-  const BANNER_H = bannerHeight(bannerRatio);
+  // The header's height comes from the banner's shape when it's known before the page shows (it was
+  // prefetched or seen before), and then never changes: resizing it once the image loaded moved the
+  // whole page just after it slid in.
+  const [ratio] = useState(() => (banner ? (bannerRatio(banner) ?? 1.91) : 1.91));
+  const [shape, setShape] = useState(ratio);
+  const [shown, setShown] = useState(false);
+  const BANNER_H = bannerHeight(ratio);
   const icon = iconOf(h)?.src ?? null;
 
   const share = () => shareHackathon(h);
@@ -110,7 +116,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
       <OverlayPage title={h.title} wide right={<SaveShare saved={saved} onSave={toggleSave} onShare={share} />}>
         <div className="px-10 pb-16">
           <Cover h={h} iconSize={112} className="h-[280px] rounded-[26px]" />
-          <motion.header initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={spring} className="mt-5 flex flex-wrap items-end justify-between gap-5 px-2">
+          <motion.header initial={false} className="mt-5 flex flex-wrap items-end justify-between gap-5 px-2">
             <div className="flex min-w-0 flex-1 basis-[520px] items-end gap-5">
               {banner && <Thumb h={h} size={104} radius={24} className="-mt-[76px] shadow-[0_0_0_5px_var(--bg),0_14px_30px_-10px_rgba(0,0,0,0.45)]" />}
               <div className="min-w-0">
@@ -118,7 +124,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {h.organizer && <span className="mr-1.5 text-subhead text-label-2">{h.organizer}</span>}
                   <StatusPill h={h} />
-                  <span className="flex h-6 items-center rounded-full bg-fill px-2.5 text-footnote font-semibold text-label-2">{source === "the web" ? "Web" : source}</span>
+                  <SourcePill h={h} />
                 </div>
               </div>
             </div>
@@ -185,13 +191,19 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden bg-[#0e0e12]" style={{ height: `calc(env(safe-area-inset-top) + ${BANNER_H})` }}>
             {/* A strip much wider than the header (Devpost's are around 7:1) is shown whole, over a
                 blurred stretch of itself, rather than cropped to its middle. */}
-            {bannerRatio > 2.6 && <img src={banner} alt="" className="absolute inset-0 h-full w-full scale-125 object-cover opacity-80 blur-2xl saturate-150" />}
+            {shape > 2.6 && <img src={banner} alt="" className="absolute inset-0 h-full w-full scale-125 object-cover opacity-80 blur-2xl saturate-150" />}
             <img
               src={banner}
               alt=""
-              onLoad={(e) => setBannerRatio(e.currentTarget.naturalWidth / Math.max(1, e.currentTarget.naturalHeight))}
+              onLoad={(e) => {
+                const r = e.currentTarget.naturalWidth / Math.max(1, e.currentTarget.naturalHeight);
+                rememberRatio(banner, r);
+                setShape(r);
+                setShown(true);
+              }}
               onError={() => setBannerFailed(true)}
-              className={cn("absolute inset-0 h-full w-full", bannerRatio > 2.6 ? "object-contain" : "object-cover")}
+              // Fades in if it arrives after the page, instead of popping in.
+              className={cn("absolute inset-0 h-full w-full transition-opacity duration-300", shape > 2.6 ? "object-contain" : "object-cover", !shown && "opacity-0")}
             />
             <div className="absolute inset-x-0 top-0 h-28" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.32), transparent)" }} />
             <div className="absolute inset-x-0 bottom-0 h-[34%]" style={{ background: "linear-gradient(180deg, transparent, var(--bg))" }} />
@@ -227,24 +239,24 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
       <div className="pb-36">
         {banner ? (
           // The icon overlaps the banner's bottom edge, App Store style, with the title below.
-          <motion.header initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={spring} className="relative px-5" style={{ marginTop: `calc(${BANNER_H} - 60px - 46px)` }}>
+          <motion.header initial={false} className="relative px-5" style={{ marginTop: `calc(${BANNER_H} - 60px - 46px)` }}>
             <Thumb h={h} size={92} radius={22} className="shadow-[0_0_0_4px_var(--bg),0_14px_30px_-10px_rgba(0,0,0,0.45)]" />
             <h1 className="mt-3.5 text-title1 font-bold tracking-[-0.026em]">{h.title}</h1>
             {h.organizer && <p className="mt-1 text-subhead text-label-2">{h.organizer}</p>}
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               <StatusPill h={h} />
-              <span className="flex h-6 items-center rounded-full bg-fill px-2.5 text-footnote font-semibold text-label-2">{source === "the web" ? "Web" : source}</span>
+              <SourcePill h={h} />
             </div>
           </motion.header>
         ) : (
-          <motion.header initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={spring} className="flex items-start gap-4 px-5 pt-2">
+          <motion.header initial={false} className="flex items-start gap-4 px-5 pt-2">
             <Thumb h={h} size={108} radius={24} className="shadow-[0_10px_24px_-6px_rgba(0,0,0,0.35)]" />
             <div className="min-w-0 flex-1 pt-0.5">
               <h1 className="text-title2 font-bold tracking-[-0.022em]">{h.title}</h1>
               {h.organizer && <p className="mt-1 text-subhead text-label-2">{h.organizer}</p>}
               <div className="mt-2.5 flex flex-wrap gap-1.5">
                 <StatusPill h={h} />
-                <span className="flex h-6 items-center rounded-full bg-fill px-2.5 text-footnote font-semibold text-label-2">{source === "the web" ? "Web" : source}</span>
+                <SourcePill h={h} />
               </div>
             </div>
           </motion.header>
@@ -379,6 +391,7 @@ export function Preview({ h }: { h: Hackathon }) {
       <p className="mt-1 text-subhead text-label-2">{[h.organizer, `on ${source === "the web" ? hostOf(h.source_url) : source}`].filter(Boolean).join(" · ")}</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         <StatusPill h={h} />
+        {h.added_by_user && <SourcePill h={h} />}
         {stage && stage !== "hidden" && <StageTag status={stage} className="h-6 rounded-full px-2.5 text-footnote" />}
       </div>
       <div className="mt-4 flex items-center gap-2">
@@ -439,6 +452,17 @@ async function shareHackathon(h: Hackathon) {
   if (await copyText(url)) toast("Link copied", "check");
 }
 
+/** Where the listing comes from, or that you added it yourself. */
+function SourcePill({ h }: { h: Hackathon }) {
+  const source = sourceName(h);
+  return (
+    <span className={cn("flex h-6 items-center gap-1 rounded-full px-2.5 text-footnote font-semibold", h.added_by_user ? "bg-soft text-ink" : "bg-fill text-label-2")}>
+      {h.added_by_user && <Icon name="plus" size={12} stroke={3} />}
+      {h.added_by_user ? "Added by you" : source === "the web" ? "Web" : source}
+    </span>
+  );
+}
+
 function StatusPill({ h }: { h: Hackathon }) {
   const s = h.status === "open" ? ["Open", "bg-green-soft text-green", "bg-green"] : h.status === "upcoming" ? ["Upcoming", "bg-soft text-ink", "bg-tint"] : ["Closed", "bg-neutral-soft text-label-2", "bg-label-2"];
   return (
@@ -463,8 +487,9 @@ export function Facts({ h, detail, className }: { h: Hackathon; detail: Hackatho
       icon: "trophy",
       tint: "var(--gold-fg)",
       label: "Prize pool",
-      value: prizeShort(h),
-      sub: h.prize_notes ? cleanText(h.prize_notes) : h.prize_usd ? (perks ? "Plus perks" : "In prizes") : "Not announced yet",
+      // Until the AI has read an amount (a hackathon you just added), what the page says.
+      value: !h.prize_usd && h.prize_text ? cleanText(h.prize_text) : prizeShort(h),
+      sub: h.prize_notes ? cleanText(h.prize_notes) : h.prize_usd ? (perks ? "Plus perks" : "In prizes") : h.prize_text ? "As the page puts it" : "Not announced yet",
     },
     days === null
       ? { icon: "calendar", tint: "var(--tint)", label: "Starts", value: h.start_date ? dayMonth(h.start_date) : "TBA", sub: h.start_date ? weekdayDate(h.start_date) : "No dates yet" }
@@ -494,7 +519,7 @@ export function Facts({ h, detail, className }: { h: Hackathon; detail: Hackatho
     },
   ];
   return (
-    <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ ...spring, delay: 0.05 }} aria-label="Key facts" className={cn("mx-4 mt-5 grid grid-cols-2 gap-2.5", className)}>
+    <motion.section initial={false} aria-label="Key facts" className={cn("mx-4 mt-5 grid grid-cols-2 gap-2.5", className)}>
       {tiles.map((t) => (
         <div key={t.label} className="card flex min-w-0 flex-col rounded-[20px] px-3.5 pt-3 pb-3.5">
           <span className="flex items-center gap-1.5 text-footnote font-semibold text-label-2">

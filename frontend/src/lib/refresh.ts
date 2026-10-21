@@ -2,7 +2,9 @@ import { useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { TabActiveContext } from "../components/kit";
 import { explainError } from "./errors";
+import { nextRefresh } from "./format";
 import { call, usePersonal } from "./personal";
+import { useData } from "./store";
 
 /**
  * "Refresh now" and its live progress (backend app/refresh.py). A run is the
@@ -113,6 +115,13 @@ export function useRefresh() {
   const phase = phaseOf(status, requestedAt);
   const running = phase.state === "running";
   const inflight = useRef(false);
+  // The latest finished run: the server's record is live, the loaded list's can be hours old.
+  const listed = useData().meta?.last_refresh ?? null;
+  const recorded = status?.pipeline?.finished_at ?? null;
+  const lastRun = !recorded ? listed : !listed ? recorded : Date.parse(recorded) > Date.parse(listed) ? recorded : listed;
+  const next = nextRefresh(lastRun);
+  // A scheduled run is due but GitHub hasn't started it yet (it often starts them late).
+  const late = phase.state !== "running" && next.due;
 
   const load = useCallback(async () => {
     if (inflight.current) return;
@@ -132,10 +141,11 @@ export function useRefresh() {
   useEffect(() => {
     if (!key || !active) return;
     void load();
-    const every = running ? 3000 : 30_000;
+    // Quickly while a run is going or due to start, so its steps show as soon as it does.
+    const every = running ? 3000 : late ? 10_000 : 30_000;
     const id = window.setInterval(() => document.visibilityState === "visible" && void load(), every);
     return () => window.clearInterval(id);
-  }, [key, active, running, load, tick]);
+  }, [key, active, running, late, load, tick]);
 
   // Once GitHub lists the run that was asked for, stop treating it as "just asked".
   useEffect(() => {
@@ -158,5 +168,5 @@ export function useRefresh() {
     }
   }, []);
 
-  return { status, phase, start, starting, error: error ?? statusProblem };
+  return { status, phase, start, starting, error: error ?? statusProblem, lastRun, next, late };
 }

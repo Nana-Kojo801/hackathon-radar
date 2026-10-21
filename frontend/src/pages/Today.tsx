@@ -12,6 +12,7 @@ import { bannerOf, countdown, daysLeft, iconOf, isNew, nextRefresh, prizeFull, p
 import { press, rise, spring } from "../lib/motion";
 import { type Stage, usePersonal } from "../lib/personal";
 import { useRefresh } from "../lib/refresh";
+import { prefetchOn } from "../lib/prefetch";
 import { linkTo, navigate } from "../lib/router";
 import { requestSearchFocus, useData } from "../lib/store";
 import { cn } from "../lib/utils";
@@ -271,7 +272,7 @@ function DeadlineCard({ h, status, days, index }: { h: Hackathon; status: Stage;
   return (
     <motion.a
       href={`/h/${h.id}`}
-      onClick={linkTo(`/h/${h.id}`)}
+      onClick={linkTo(`/h/${h.id}`)} {...prefetchOn(h)}
       {...rise(index, 4)}
       whileTap={press}
       className="card flex w-[300px] shrink-0 flex-col rounded-[24px] p-4"
@@ -318,7 +319,7 @@ function Hero({ h, className, stacked }: { h: Hackathon; className?: string; sta
   return (
     <motion.a
       href={`/h/${h.id}`}
-      onClick={linkTo(`/h/${h.id}`)}
+      onClick={linkTo(`/h/${h.id}`)} {...prefetchOn(h)}
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={spring}
@@ -374,7 +375,7 @@ function Hero({ h, className, stacked }: { h: Hackathon; className?: string; sta
 function CompactRow({ h, index, last, stage }: { h: Hackathon; index: number; last: boolean; stage: Stage | null }) {
   return (
     <motion.li {...rise(index)}>
-      <a href={`/h/${h.id}`} onClick={linkTo(`/h/${h.id}`)} className="flex items-center gap-3 pl-3.5 transition-colors active:bg-fill">
+      <a href={`/h/${h.id}`} onClick={linkTo(`/h/${h.id}`)} {...prefetchOn(h)} className="flex items-center gap-3 pl-3.5 transition-colors active:bg-fill">
         <Thumb h={h} size={52} radius={13} />
         <div className={cn("flex min-h-[76px] min-w-0 flex-1 items-center gap-2.5 py-3 pr-3.5", !last && "border-b hairline")}>
           <div className="min-w-0 flex-1">
@@ -446,7 +447,7 @@ function NewSection({ loading, fresh, title, lastRefresh, onSeeAll }: { loading:
 
 function Tile({ h, index }: { h: Hackathon; index: number }) {
   return (
-    <motion.a href={`/h/${h.id}`} onClick={linkTo(`/h/${h.id}`)} {...rise(index, 4)} whileTap={press} className="w-[150px] shrink-0">
+    <motion.a href={`/h/${h.id}`} onClick={linkTo(`/h/${h.id}`)} {...prefetchOn(h)} {...rise(index, 4)} whileTap={press} className="w-[150px] shrink-0">
       <span className="relative block">
         <Thumb h={h} size={150} radius={20} />
         <span className="absolute top-2 left-2 flex h-[22px] items-center rounded-full bg-accent px-2 text-[11px] font-bold tracking-[0.04em] text-on-accent">NEW</span>
@@ -532,7 +533,7 @@ function NewGrid({ loading, fresh, title, lastRefresh, onSeeAll }: { loading: bo
           <motion.a
             key={h.id}
             href={`/h/${h.id}`}
-            onClick={linkTo(`/h/${h.id}`)}
+            onClick={linkTo(`/h/${h.id}`)} {...prefetchOn(h)}
             {...rise(i, 4)}
             className="card flex flex-col overflow-hidden rounded-[20px] transition-transform duration-200 hover:-translate-y-0.5"
           >
@@ -572,7 +573,7 @@ function DeadlineList({ tracked }: { tracked: { h: Hackathon; status: Stage; day
             const urgent = t.days <= 1;
             return (
               <li key={t.h.id} className={cn(i > 0 && "border-t hairline")}>
-                <a href={`/h/${t.h.id}`} onClick={linkTo(`/h/${t.h.id}`)} className="block py-3 hover:opacity-80">
+                <a href={`/h/${t.h.id}`} onClick={linkTo(`/h/${t.h.id}`)} {...prefetchOn(t.h)} className="block py-3 hover:opacity-80">
                   <span className="flex items-start justify-between gap-2">
                     <span className="line-clamp-2 text-subhead font-semibold">{t.h.title}</span>
                     <StageTag status={t.status} />

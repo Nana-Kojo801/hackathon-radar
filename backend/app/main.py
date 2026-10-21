@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import config, db, personal, push, refresh, stats
+from . import add, config, db, personal, push, refresh, stats
 from .categories import CATEGORIES, STATUSES, VISIBLE
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -27,6 +27,7 @@ app.include_router(push.router)
 app.include_router(push.public_router)
 app.include_router(stats.router)
 app.include_router(refresh.router)
+app.include_router(add.router)
 app.include_router(stats.public_router)
 
 # image_url is the one image for things that want just one: the listing's own,
@@ -42,7 +43,7 @@ LIST_COLUMNS = """
     prize_text, prize_usd::float AS prize_usd, prize_confidence, prize_notes,
     format, location_text, categories, international_ok, student_only,
     start_date, end_date, registration_deadline, status, relevance_score,
-    first_seen_at, last_seen_at, (enriched_at IS NOT NULL) AS enriched
+    first_seen_at, last_seen_at, (enriched_at IS NOT NULL) AS enriched, added_by_user
 """
 
 

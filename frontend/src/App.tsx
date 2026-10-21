@@ -2,9 +2,11 @@ import { MotionConfig } from "framer-motion";
 import { lazy, type PointerEvent, type ReactNode, type RefObject, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { TabActiveContext, ToastView } from "./components/kit";
+import { AddSheet } from "./components/AddSheet";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
 import { fetchData, fetchJSON, type Hackathon, type Meta } from "./lib/api";
+import { openAdd } from "./lib/add";
 import { appearance, useAppearance } from "./lib/appearance";
 import { DEFAULT_FILTERS, type Filters, lastVisit, loadFilters, saveFilters } from "./lib/filters";
 import { isDesktop, useDesktop } from "./lib/desktop";
@@ -16,7 +18,7 @@ import { goBack, type Overlay, parse, type Route, TAB_PATH, type Tab, usePath } 
 import { flush as flushActivity, startActivityLog } from "./lib/stats";
 import { currentOffset, fade, reducedMotion, slide } from "./lib/transition";
 import { cn } from "./lib/utils";
-import { type AppData, DataContext } from "./lib/store";
+import { type AppData, DATA_STALE_EVENT, DataContext } from "./lib/store";
 import { AppearancePage } from "./pages/Appearance";
 import { Detail } from "./pages/Detail";
 import { EmailAlertsPage } from "./pages/EmailAlerts";
@@ -43,6 +45,16 @@ const SNAPSHOT_STALE_AFTER = 13 * 3_600_000;
 // The app restores each tab's scroll itself.
 if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
 
+// Something shared to the installed app (Android share sheet, manifest share_target) arrives at
+// /add?title=…&text=…&url=…: open Add a hackathon with it, over Explore.
+const shared = (() => {
+  if (window.location.pathname.replace(/\/+$/, "") !== "/add") return null;
+  const q = new URLSearchParams(window.location.search);
+  const text = [q.get("title"), q.get("text"), q.get("url")].filter(Boolean).join("\n");
+  window.history.replaceState(null, "", "/explore");
+  return text;
+})();
+
 // Open on the tab chosen in Settings, unless the app was opened on a specific page.
 if (window.location.pathname === "/" && appearance().startTab !== "today") {
   window.history.replaceState(null, "", TAB_PATH[appearance().startTab]);
@@ -66,6 +78,7 @@ export default function App() {
   useEffect(() => {
     void sync();
     startActivityLog();
+    if (shared !== null) openAdd(shared);
   }, []);
   // Activity logged before the device was connected goes up once it is.
   useEffect(() => {
@@ -118,6 +131,30 @@ export default function App() {
     };
   }, [reload]);
 
+  // A refresh lands every 6 hours (or when you run one). The list is loaded once, so check the snapshot
+  // when the app comes back to the screen and every few minutes, and reload when a newer one is out:
+  // otherwise "last refreshed" and "next refresh" kept showing the old run until the app was reopened.
+  const lastRefresh = useRef<string | null | undefined>(undefined);
+  lastRefresh.current = meta?.last_refresh;
+  useEffect(() => {
+    const check = () => {
+      if (document.visibilityState !== "visible" || lastRefresh.current === undefined) return;
+      fetchData<Meta>("meta.json", "/meta")
+        .then((m) => {
+          if (m.last_refresh && m.last_refresh !== lastRefresh.current) setReload((n) => n + 1);
+        })
+        .catch(() => undefined);
+    };
+    const id = window.setInterval(check, 4 * 60_000);
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener(DATA_STALE_EVENT, check);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener(DATA_STALE_EVENT, check);
+    };
+  }, []);
+
   const setFilters = useCallback((f: Filters) => {
     setFiltersState(f);
     saveFilters(f);
@@ -142,9 +179,10 @@ export default function App() {
   }, [all]);
   const warning = useMemo(() => healthWarning(meta), [meta]);
 
+  const addLocal = useCallback((h: Hackathon) => setAll((prev) => [h, ...prev.filter((x) => x.id !== h.id)]), []);
   const data: AppData = useMemo(
-    () => ({ items, live, meta, loading, slow, error, retry: () => setReload((n) => n + 1), filters, setFilters, newSince, categories, warning }),
-    [items, live, meta, loading, slow, error, filters, setFilters, newSince, categories, warning],
+    () => ({ items, live, meta, loading, slow, error, retry: () => setReload((n) => n + 1), filters, setFilters, newSince, categories, warning, addLocal }),
+    [items, live, meta, loading, slow, error, filters, setFilters, newSince, categories, warning, addLocal],
   );
 
   // ------------------------------------------------------------ badge
@@ -313,6 +351,7 @@ export default function App() {
             {render(l.overlay)}
           </OverlayLayer>
         ))}
+        <AddSheet />
         <ToastView />
       </MotionConfig>
     </DataContext.Provider>

@@ -6,6 +6,7 @@ import type { Density } from "../lib/appearance";
 import { categoryLabel, FORMAT_LABEL, hostOf, mainCategory, prizeShort, sourceName } from "../lib/format";
 import { rise, spring } from "../lib/motion";
 import { type Stage, track } from "../lib/personal";
+import { prefetchOn } from "../lib/prefetch";
 import { navigate } from "../lib/router";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
@@ -130,6 +131,7 @@ export function HackRow({
         dragMomentum={false}
         onDragStart={() => (dragged.current = true)}
         onDragEnd={onDragEnd}
+        {...prefetchOn(h)}
         onDoubleClick={onSelect ? () => navigate(`/h/${h.id}`) : undefined}
         aria-current={selected || undefined}
         style={{ x, touchAction: "pan-y" }}

@@ -1,11 +1,11 @@
 import { motion } from "framer-motion";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { countdown, SOURCE_NAME, timeAgo } from "../lib/format";
 import { bouncy, press } from "../lib/motion";
 import { type Phase, type RefreshStatus, STEPS, type StepKey, useRefresh } from "../lib/refresh";
 import { navigate } from "../lib/router";
-import { useData } from "../lib/store";
+import { checkForNewData } from "../lib/store";
 import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
 
@@ -15,19 +15,17 @@ import { Icon } from "./Icon";
  * covers, alerts and publishing steps, with a timer.
  */
 export function RefreshCard() {
-  const d = useData();
-  const { status, phase, start, starting, error } = useRefresh();
+  const { status, phase, start, starting, error, lastRun, next, late } = useRefresh();
   const running = phase.state === "running";
   const stepIndex = running || phase.state === "failed" ? STEPS.findIndex((s) => s.key === phase.step) : phase.state === "done" ? STEPS.length : -1;
   const since = runStart(status);
   const now = useNow(running ? 1000 : 30_000);
   const totals = sourceTotals(status);
-  // When a run finishes, load the fresh list.
-  const wasRunning = useRef(running);
+  // When a run has finished (seen here or not), load the fresh list if the app doesn't have it yet.
+  const doneAt = phase.state === "done" ? phase.at : null;
   useEffect(() => {
-    if (wasRunning.current && phase.state === "done") d.retry();
-    wasRunning.current = running;
-  }, [running, phase.state, d]);
+    if (doneAt) checkForNewData();
+  }, [doneAt]);
   // Show the steps while running, and for a while after a run ends.
   const recent = phase.state === "failed" || (phase.state === "done" && now - Date.parse(phase.at) < 15 * 60_000);
   const showSteps = running || recent;
@@ -38,11 +36,15 @@ export function RefreshCard() {
       <div className="card overflow-hidden rounded-[22px]">
         <div className="flex items-center gap-3 p-3.5">
           <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px]", phase.state === "failed" ? "bg-red-soft text-red" : phase.state === "done" && recent ? "bg-green-soft text-green" : "bg-soft text-tint")}>
-            <Icon name={phase.state === "failed" ? "alert" : phase.state === "done" && recent ? "check" : "refresh"} size={22} stroke={2.2} className={cn(running && "spin")} />
+            <Icon name={phase.state === "failed" ? "alert" : phase.state === "done" && recent ? "check" : late ? "clock" : "refresh"} size={22} stroke={2.2} className={cn(running && "spin")} />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-body font-semibold tracking-[-0.02em]">{title(phase, recent)}</div>
-            <div className="truncate text-footnote text-label-2">{subtitle(phase, status, totals, since, now, recent)}</div>
+            <div className="text-body font-semibold tracking-[-0.02em]">{late && !recent ? "Waiting for the scheduled run" : title(phase, recent)}</div>
+            <div className="text-footnote text-label-2">
+              {late && !recent
+                ? `It was due ${timeAgo(new Date(next.at).toISOString(), now)}. GitHub often starts scheduled runs late; its steps show here once it starts.`
+                : subtitle(phase, totals, since, now, recent, lastRun, next.at)}
+            </div>
           </div>
           {running ? (
             <span className="shrink-0 text-subhead font-semibold text-label-2 tabular">{since ? countdown(now - since).replace(/^0:/, "") : ""}</span>
@@ -199,9 +201,12 @@ function title(phase: Phase, recent: boolean): string {
   return "Run the search";
 }
 
-function subtitle(phase: Phase, s: RefreshStatus | null, totals: { found: number; new: number }, since: number | null, now: number, recent: boolean): string {
+function subtitle(phase: Phase, totals: { found: number; new: number }, since: number | null, now: number, recent: boolean, lastRun: string | null, nextAt: number): string {
   if (phase.state === "running") return totals.found ? `${totals.found} found so far · ${totals.new} new` : "Started just now";
   if (phase.state === "failed") return `At "${STEPS.find((x) => x.key === phase.step)?.label}". The next scheduled run tries again.`;
   if (phase.state === "done" && recent) return `${totals.new} new · finished ${timeAgo(phase.at, now)}${since ? ` · took ${countdown(Date.parse(phase.at) - since).replace(/^0:/, "")}` : ""}`;
-  return s?.pipeline?.finished_at ? `Last run ${timeAgo(s.pipeline.finished_at, now)}. Runs every 6 hours.` : "Runs every 6 hours.";
+  const at = new Date(nextAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const mins = Math.max(1, Math.round((nextAt - now) / 60_000));
+  const inWords = mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)} h${mins % 60 ? ` ${mins % 60} min` : ""}`;
+  return `${lastRun ? `Last run ${timeAgo(lastRun, now)}. ` : ""}Next around ${at}, in ${inWords}.`;
 }

@@ -126,7 +126,8 @@ def enrich_one(row: dict, usage: ai.Usage) -> dict:
 def _apply(cur, row: dict, res: dict) -> None:
     hints = row.get("hints") or {}
     hint_prize = hints.get("prize_usd")
-    hidden = not res["is_real_hackathon"] and row["source"] in DROPPABLE_SOURCES
+    # Never one you added yourself: you've already said it's real.
+    hidden = not res["is_real_hackathon"] and row["source"] in DROPPABLE_SOURCES and not row.get("added_by_user")
     cur.execute(
         """
         UPDATE hackathons SET
