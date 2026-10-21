@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useMemo, useRef, useState } from "react";
 
 import { Icon, type IconName } from "../components/Icon";
 import { Banner, CompactBar, Cover, DeskHeader, DueTag, GlassButton, LargeTitle, PrimaryButton, SectionHeader, StageTag, Thumb, useScrolled } from "../components/kit";
@@ -12,6 +12,7 @@ import { bannerOf, countdown, daysLeft, iconOf, nextRefresh, prizeFull, prizeSho
 import { press, rise, spring } from "../lib/motion";
 import { type Stage, usePersonal } from "../lib/personal";
 import { useRefresh } from "../lib/refresh";
+import { type Spotlight, spotlights } from "../lib/spotlights";
 import { prefetchOn } from "../lib/prefetch";
 import { linkTo, navigate } from "../lib/router";
 import { requestSearchFocus, useData } from "../lib/store";
@@ -36,7 +37,7 @@ export function Today() {
     return out.sort((a, b) => Date.parse(a.h.registration_deadline!) - Date.parse(b.h.registration_deadline!));
   }, [personal.items, d.live]);
 
-  const { closingWeek, featured, closingTop, fresh, freshToday, freshDay } = useMemo(() => {
+  const { closingWeek, closingTop, fresh, freshToday, freshDay } = useMemo(() => {
     const mine = new Set(Object.keys(personal.items));
     const week = d.items.filter((h) => {
       const n = daysLeft(h);
@@ -52,13 +53,18 @@ export function Today() {
     const foundYesterday = foundToday.length ? [] : d.items.filter((h) => Date.parse(h.first_seen_at) >= yesterday && Date.parse(h.first_seen_at) < today).sort(byPrizeDesc);
     return {
       closingWeek: week,
-      featured: byPrize[0] ?? null,
+      // The biggest is the spotlight's "Biggest prize this week".
       closingTop: byPrize.slice(1, 6),
       fresh: foundToday.length ? foundToday : foundYesterday,
       freshToday: foundToday.length,
       freshDay: foundToday.length || !foundYesterday.length ? ("today" as const) : ("yesterday" as const),
     };
   }, [d.items, d.newSince, personal.items]);
+
+  const spots = useMemo(
+    () => spotlights(d.items, new Set(Object.keys(personal.items)), Date.parse(d.newSince ?? dayStart())),
+    [d.items, personal.items, d.newSince],
+  );
 
   const goExplore = (patch: Partial<Filters>) => {
     d.setFilters({ ...DEFAULT_FILTERS, sort: d.filters.sort, ...patch });
@@ -145,13 +151,11 @@ export function Today() {
             <aside aria-label="At a glance" className="flex w-[340px] shrink-0 flex-col gap-5">
               <Glance loading={d.loading} cells={glance} className="mx-0 mt-0" />
               <DeadlineList tracked={tracked} />
-              {featured && (
-                <div>
-                  <div className={cn("mb-2 text-footnote font-semibold tracking-[0.02em] uppercase", dueTag(featured).tone === "red" ? "text-red" : "text-orange")}>
-                    Biggest prize this week · {dueTag(featured).text}
-                  </div>
-                  <Hero h={featured} className="mx-0" stacked />
-                </div>
+              {spots.length > 0 && (
+                <section aria-label="Spotlight">
+                  <h2 className="mb-2 text-headline font-semibold tracking-[-0.02em]">Spotlight</h2>
+                  <Spotlights spots={spots} rail />
+                </section>
               )}
               <WeekRecap className="mx-0 mt-0" />
             </aside>
@@ -226,13 +230,10 @@ export function Today() {
             <TodaySkeleton />
           ) : (
             <>
-              {featured && (
+              {spots.length > 0 && (
                 <>
-                  <SectionHeader
-                    title="Biggest prize this week"
-                    eyebrow={<div className={cn("text-footnote font-semibold tracking-[0.02em] uppercase", dueTag(featured).tone === "red" ? "text-red" : "text-orange")}>{dueTag(featured).text}</div>}
-                  />
-                  <Hero h={featured} />
+                  <SectionHeader title="Spotlight" />
+                  <Spotlights spots={spots} />
                 </>
               )}
 
@@ -318,7 +319,7 @@ function DeadlineCard({ h, status, days, index }: { h: Hackathon; status: Stage;
 }
 
 /** A wide banner fills the card; otherwise the square icon sits on a blurred wash of itself. */
-function Hero({ h, className, stacked }: { h: Hackathon; className?: string; stacked?: boolean }) {
+function Hero({ h, className, stacked, spot }: { h: Hackathon; className?: string; stacked?: boolean; spot?: Spotlight }) {
   const [bannerFailed, setBannerFailed] = useState(false);
   const [failed, setFailed] = useState(false);
   const banner = bannerFailed ? null : bannerOf(h);
@@ -366,7 +367,13 @@ function Hero({ h, className, stacked }: { h: Hackathon; className?: string; sta
             </svg>
           </div>
         )}
-        <span className="absolute top-3 left-3 flex h-7 items-center gap-1.5 rounded-full bg-black/45 px-2.5 text-footnote font-semibold text-white backdrop-blur-xl">
+        {spot && (
+          <span className="absolute top-3 left-3 flex h-7 max-w-[calc(100%-150px)] items-center gap-1.5 rounded-full bg-black/55 px-2.5 text-footnote font-semibold text-white backdrop-blur-xl">
+            <Icon name={spot.icon} size={13} filled />
+            <span className="truncate">{spot.label}</span>
+          </span>
+        )}
+        <span className={cn("absolute top-3 flex h-7 items-center gap-1.5 rounded-full bg-black/45 px-2.5 text-footnote font-semibold text-white backdrop-blur-xl", spot ? "right-3" : "left-3")}>
           <Icon name="clock" size={12} stroke={2.8} />
           {dueTag(h).text}
         </span>
@@ -375,6 +382,12 @@ function Hero({ h, className, stacked }: { h: Hackathon; className?: string; sta
         <div className="min-w-0 flex-1">
           <div className="line-clamp-2 text-title3 font-bold tracking-[-0.02em]">{h.title}</div>
           <div className="mt-0.5 truncate text-subhead text-label-2">{meta(h)}</div>
+          {spot?.why && spot.key !== "prize" && spot.key !== "last" && (
+            <div className="mt-1 flex items-center gap-1 text-footnote font-semibold" style={{ color: spot.tone }}>
+              <Icon name={spot.icon} size={13} filled />
+              {spot.why}
+            </div>
+          )}
         </div>
         <div className={cn("shrink-0", !stacked && "text-right")}>
           <div className="text-[calc(22px*var(--ts))] leading-tight font-bold tracking-[-0.025em] tabular">{prizeFull(h)}</div>
@@ -629,5 +642,67 @@ function RefreshButton() {
       <Icon name="refresh" size={17} className={running ? "animate-spin" : undefined} />
       {running ? "Refreshing…" : "Refresh now"}
     </motion.button>
+  );
+}
+
+/**
+ * The spotlight carousel: swipe sideways through hackathons that stand out for different reasons.
+ * The next card peeks in on a phone; dots (and arrows on a computer) show where you are.
+ */
+function Spotlights({ spots, rail }: { spots: Spotlight[]; rail?: boolean }) {
+  const scroller = useRef<HTMLDivElement>(null);
+  const [at, setAt] = useState(0);
+  const slideAt = (i: number) => scroller.current?.children[i] as HTMLElement | undefined;
+  const onScroll = () => {
+    const el = scroller.current;
+    const first = slideAt(0);
+    if (!el || !first) return;
+    setAt(Math.max(0, Math.min(spots.length - 1, Math.round(el.scrollLeft / (first.offsetWidth + 12)))));
+  };
+  const go = (i: number) => {
+    const el = scroller.current;
+    const slide = slideAt(i);
+    if (el && slide) el.scrollTo({ left: slide.offsetLeft - (el.clientWidth - slide.offsetWidth) / 2, behavior: "smooth" });
+  };
+  return (
+    <div>
+      <div
+        ref={scroller}
+        onScroll={onScroll}
+        className={cn("no-scrollbar relative flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1", rail ? "" : "scroll-px-4 px-4")}
+      >
+        {spots.map((s) => (
+          <div key={s.key} className={cn("shrink-0 snap-center", rail ? "w-full" : "w-[calc(100%-36px)]")}>
+            <Hero h={s.h} spot={s} className="mx-0 h-full" stacked={rail} />
+          </div>
+        ))}
+      </div>
+      {spots.length > 1 && (
+        <div className="mt-2.5 flex items-center justify-center gap-1.5">
+          {rail && (
+            <button type="button" aria-label="Previous" disabled={at === 0} onClick={() => go(at - 1)} className="mr-1 flex h-7 w-7 items-center justify-center rounded-full bg-fill text-label disabled:opacity-35">
+              <Icon name="back" size={13} stroke={2.8} />
+            </button>
+          )}
+          {spots.map((s, i) => (
+            <button
+              key={s.key}
+              type="button"
+              aria-label={`${s.label} (${i + 1} of ${spots.length})`}
+              aria-current={i === at || undefined}
+              onClick={() => go(i)}
+              className="flex h-5 items-center"
+            >
+              <span className={cn("block h-1.5 rounded-full transition-all duration-300", i === at ? "w-4 bg-accent" : "w-1.5 bg-label-3")} />
+            </button>
+          ))}
+          {rail && (
+            <button type="button" aria-label="Next" disabled={at === spots.length - 1} onClick={() => go(at + 1)} className="ml-1 flex h-7 w-7 items-center justify-center rounded-full bg-fill text-label disabled:opacity-35">
+              <Icon name="chevron" size={13} stroke={2.8} />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

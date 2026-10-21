@@ -53,12 +53,12 @@ def _insert(cur, n: Normalized) -> None:
             source, source_url, title, title_key, organizer, description_raw, image_url, icon_url, banner_url,
             prize_text, prize_usd, prize_confidence, format, location_text, categories,
             international_ok, student_only, start_date, end_date, registration_deadline,
-            dates_text, content_hash, hints, raw_payload, prizes
+            dates_text, content_hash, hints, raw_payload, prizes, registrations
         ) VALUES (
             %(source)s, %(url)s, %(title)s, %(key)s, %(org)s, %(desc)s, %(img)s, %(icon)s, %(banner)s,
             %(prize_text)s, %(prize_usd)s, %(prize_conf)s, %(format)s, %(loc)s, %(cats)s,
             %(intl)s, %(student)s, %(start)s, %(end)s, %(deadline)s,
-            %(dates_text)s, %(hash)s, %(hints)s, %(raw)s, %(prizes)s
+            %(dates_text)s, %(hash)s, %(hints)s, %(raw)s, %(prizes)s, %(regs)s
         )
         """,
         {
@@ -71,7 +71,7 @@ def _insert(cur, n: Normalized) -> None:
             "intl": r.international_ok, "student": r.student_only,
             "start": r.start_date, "end": r.end_date, "deadline": r.registration_deadline,
             "dates_text": r.dates_text, "hash": n.content_hash, "hints": Jsonb(_hints(n)),
-            "raw": Jsonb(r.raw_payload, dumps=_dumps), "prizes": Jsonb(r.prizes),
+            "raw": Jsonb(r.raw_payload, dumps=_dumps), "prizes": Jsonb(r.prizes), "regs": r.registrations,
         },
     )
 
@@ -115,6 +115,7 @@ def _update_primary(cur, row: dict, n: Normalized) -> None:
             -- Changed listing: fetch its own page again on the next detail step.
             details_fetched_at = CASE WHEN content_hash = %(hash)s THEN details_fetched_at ELSE NULL END,
             prizes = CASE WHEN jsonb_array_length(%(prizes)s) > 0 THEN %(prizes)s ELSE prizes END,
+            registrations = COALESCE(%(regs)s, registrations),
             content_hash = %(hash)s,
             hints = %(hints)s,
             raw_payload = %(raw)s,
@@ -131,7 +132,7 @@ def _update_primary(cur, row: dict, n: Normalized) -> None:
             "student": r.student_only, "start": r.start_date, "end": r.end_date,
             "deadline": r.registration_deadline, "dates_text": r.dates_text,
             "hash": n.content_hash, "hints": Jsonb(_hints(n)),
-            "raw": Jsonb(r.raw_payload, dumps=_dumps), "prizes": Jsonb(r.prizes),
+            "raw": Jsonb(r.raw_payload, dumps=_dumps), "prizes": Jsonb(r.prizes), "regs": r.registrations,
         },
     )
 

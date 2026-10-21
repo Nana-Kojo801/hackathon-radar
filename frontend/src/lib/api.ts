@@ -48,6 +48,8 @@ export interface Hackathon {
   enriched: boolean;
   /** You added it yourself (Add a hackathon), rather than the radar finding it. */
   added_by_user?: boolean;
+  /** People registered, when the platform says (Devpost, Unstop). */
+  registrations?: number | null;
 }
 
 export interface Prize {

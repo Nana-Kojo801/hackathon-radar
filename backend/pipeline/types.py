@@ -39,6 +39,8 @@ class RawListing:
     banner_url: str | None = None
     # Prize breakdown: [{"name", "amount_text", "amount_usd" (per winner), "winners", "perks"}]
     prizes: list[dict] = field(default_factory=list)
+    # How many people have registered, when the platform says (Devpost, Unstop).
+    registrations: int | None = None
 
 
 class Source:

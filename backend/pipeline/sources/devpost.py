@@ -90,6 +90,7 @@ class DevpostSource(Source):
             end_date=end,
             # Devpost registration stays open until the submission deadline.
             registration_deadline=end,
+            registrations=h.get("registrations_count") if isinstance(h.get("registrations_count"), int) else None,
             prize_usd=to_usd(amount, currency),
             prize_confidence="high" if currency == "USD" else "medium",
             format="online" if online else "in_person",

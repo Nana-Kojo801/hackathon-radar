@@ -31,8 +31,10 @@ def test_unstop_item():
         "filters": [{"name": "Engineering Students", "type": "eligible"}, {"name": "Tech", "type": "category"}],
         "details": "<p><strong>Build under pressure.</strong></p><p>Pitch with conviction.</p>",
         "logoUrl2": "https://cdn.example/logo.jpg",
+        "registerCount": 312,
     }
     r = unstop.to_listing(item)
+    assert r.registrations == 312
     assert r.title == "Pitch//break: The Survival Arena"
     assert r.format == "in_person"
     assert r.location_text == "East Delhi, Delhi, India"

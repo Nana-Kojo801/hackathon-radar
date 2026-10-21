@@ -64,6 +64,9 @@ const ICONS = {
   flag: "flag",
   sparkle: "sparkle",
   trash: "trash",
+  female: "gender-female",
+  lightning: "lightning",
+  users: "users",
 };
 
 /** Theme glyphs on art-less listings (lib/format.ts fallbackArt): fill weight only. */

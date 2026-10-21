@@ -200,3 +200,19 @@ def test_details_step_stores_description_and_prizes_without_overwrite(conn):
     assert row["description_detail"].startswith("A long description")
     assert row["prizes"][0]["amount_usd"] == 3000
     assert Detailed.calls == 1
+
+
+def test_registration_counts_are_kept_and_updated(conn):
+    from pipeline import store
+    from pipeline.normalize import normalize
+
+    with conn.cursor() as cur:
+        store.upsert(cur, normalize(_listing(registrations=1200)))
+        store.upsert(cur, normalize(_listing(registrations=1500)))
+        cur.execute("SELECT registrations FROM hackathons")
+        assert cur.fetchone()["registrations"] == 1500
+        # A later read without the count keeps the last known one.
+        store.upsert(cur, normalize(_listing(registrations=None)))
+        cur.execute("SELECT registrations FROM hackathons")
+        assert cur.fetchone()["registrations"] == 1500
+    conn.commit()

@@ -44,7 +44,7 @@ LIST_COLUMNS = """
     prize_text, prize_usd::float AS prize_usd, prize_confidence, prize_notes,
     format, location_text, categories, international_ok, student_only,
     start_date, end_date, registration_deadline, status, relevance_score,
-    first_seen_at, last_seen_at, (enriched_at IS NOT NULL) AS enriched, added_by_user
+    first_seen_at, last_seen_at, (enriched_at IS NOT NULL) AS enriched, added_by_user, registrations
 """
 
 

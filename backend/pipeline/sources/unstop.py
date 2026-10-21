@@ -140,6 +140,7 @@ def to_listing(item: dict) -> RawListing | None:
         raw_payload={k: item.get(k) for k in ("id", "title", "region", "end_date", "prizes", "regnRequirements", "filters")},
         end_date=parse_iso(item.get("end_date")),
         registration_deadline=parse_iso(regn.get("end_regn_dt")),
+        registrations=item.get("registerCount") if isinstance(item.get("registerCount"), int) else None,
         prize_usd=prize_usd,
         prize_confidence="medium" if prize_usd else None,
         format=fmt,
