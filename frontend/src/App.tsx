@@ -9,7 +9,7 @@ import { fetchData, fetchJSON, type Hackathon, type Meta } from "./lib/api";
 import { openAdd } from "./lib/add";
 import { forgetDetails } from "./lib/prefetch";
 import { appearance, useAppearance } from "./lib/appearance";
-import { DEFAULT_FILTERS, type Filters, lastVisit, loadFilters, saveFilters } from "./lib/filters";
+import { dayStart, DEFAULT_FILTERS, type Filters, loadFilters, saveFilters } from "./lib/filters";
 import { isDesktop, useDesktop } from "./lib/desktop";
 import { daysLeft } from "./lib/format";
 import { healthWarning } from "./lib/health";
@@ -94,7 +94,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [filters, setFiltersState] = useState<Filters>(loadFilters);
-  const [newSince] = useState(lastVisit);
+  // "New" means found today, by this device's clock; it moves on at midnight.
+  const [newSince, setNewSince] = useState(() => dayStart());
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -143,6 +144,7 @@ export default function App() {
   shownMeta.current = meta;
   useEffect(() => {
     const check = () => {
+      setNewSince((was) => (was === dayStart() ? was : dayStart()));
       const cur = shownMeta.current;
       if (document.visibilityState !== "visible" || !cur) return;
       fetchData<Meta>("meta.json", "/meta")

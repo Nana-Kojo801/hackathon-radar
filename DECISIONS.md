@@ -206,3 +206,9 @@ A small static FX table (`normalize.FX_TO_USD`) converts INR/EUR/CAD/etc. right 
 ## No flicker after a hackathon's page slides in
 
 - The page used to fetch its details and banner only once it appeared, so they landed just after the slide: content appeared, and the banner header resized to the image's shape, moving the whole page. Now a touch on a hackathon starts loading both (`lib/prefetch.ts`), the header's height is fixed from the start (the banner's shape when known, else the usual 1.91:1), and the banner fades in if it's late. The header and facts no longer play their own entrance animation on top of the slide.
+
+## New today, an on-time schedule, folding run steps
+
+- **"New today" means found today**, by the device's clock: every hackathon first seen since midnight, from all of the day's runs, not just those since your last visit (opening the app after the morning run used to hide the morning's finds once the next run landed). Explore's "New today" filter and the sidebar shortcut use the same day. Just after midnight, before the day's first finds, Today shows yesterday's as "New yesterday".
+- **The 6-hourly refresh runs on time.** GitHub's scheduled runs started 3 to 6 hours late and some never came, so a refresh due at 18:17 needed Run now. The Cloudflare Worker (already serving the app) has a cron at each slot that calls the API's `POST /schedule/tick`, which starts the run through GitHub with the server's `GITHUB_TOKEN` when none has started since the slot. No key: all it can do is start the run that's due, once. A second cron 30 minutes later covers a slow wake-up of the free API. GitHub's schedule stays as a fallback that skips itself if a run happened in the last 3 hours.
+- **The run's steps fold away:** open while a run is going or just failed, folded when it's done, with a button to show or hide them.

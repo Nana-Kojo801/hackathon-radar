@@ -13,7 +13,12 @@
   },
   "vars": {
     // Where app/snapshot.py publishes the data (GitHub Pages).
-    "SNAPSHOT_URL": "https://nana-kojo801.github.io/hackathon-radar"
+    "SNAPSHOT_URL": "https://nana-kojo801.github.io/hackathon-radar",
+    // The API, which starts the scheduled refresh on GitHub (POST /schedule/tick).
+    "API_URL": "https://hackathon-radar-api-cob5.onrender.com"
   },
+  // Start each 6-hourly refresh on time (GitHub's own schedule runs hours late), and try again
+  // half an hour later in case the free API was too slow to wake. A second call does nothing.
+  "triggers": { "crons": ["17 */6 * * *", "47 */6 * * *"] },
   "observability": { "enabled": true }
 }

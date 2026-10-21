@@ -1,8 +1,11 @@
 name: Refresh hackathons
 
 on:
+  # Every 6 hours, off the top of the hour. GitHub starts these hours late (and skips some), so the
+  # Cloudflare Worker's cron starts each run on time through the API (POST /schedule/tick); this
+  # schedule is the fallback, and skips itself when a run has already happened.
   schedule:
-    - cron: "17 */6 * * *" # every 6 hours (off the top of the hour to dodge the cron rush)
+    - cron: "17 */6 * * *"
   workflow_dispatch:
     inputs:
       sources:
@@ -14,6 +17,10 @@ concurrency:
   group: refresh
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -22,14 +29,33 @@ jobs:
       run:
         working-directory: backend
     steps:
+      - name: Skip a late scheduled run
+        id: guard
+        if: github.event_name == 'schedule'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Another run started in the last 3 hours (on time from the Worker, or by hand): this one is redundant.
+          since=$(date -u -d '3 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+          recent=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow refresh.yml --limit 10 --json databaseId,createdAt \
+            --jq "[.[] | select(.databaseId != ${GITHUB_RUN_ID} and .createdAt >= \"$since\")] | length")
+          if [ "${recent:-0}" -gt 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::A refresh already ran in the last 3 hours; skipping this late scheduled run."
+          fi
       - uses: actions/checkout@v4
+        if: steps.guard.outputs.skip != 'true'
       - uses: actions/setup-python@v5
+        if: steps.guard.outputs.skip != 'true'
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements.txt
-      - run: pip install -r requirements.txt
+      - if: steps.guard.outputs.skip != 'true'
+        run: pip install -r requirements.txt
       - name: Run pipeline
+        if: steps.guard.outputs.skip != 'true'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -51,7 +77,7 @@ jobs:
             python -m pipeline.run
           fi
       - name: Emails and push notifications
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.guard.outputs.skip != 'true' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}

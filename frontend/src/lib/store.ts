@@ -16,7 +16,7 @@ export interface AppData {
   retry: () => void;
   filters: Filters;
   setFilters: (f: Filters) => void;
-  /** Start of your previous visit, for "new since"; null means "the last 48 hours". */
+  /** Midnight at the start of today: "new" means found today. */
   newSince: string | null;
   categories: { category: string; count: number }[];
   warning: { key: string; text: string } | null;

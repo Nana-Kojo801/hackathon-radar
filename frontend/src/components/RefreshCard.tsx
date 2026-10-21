@@ -29,6 +29,13 @@ export function RefreshCard() {
   // Show the steps while running, and for a while after a run ends.
   const recent = phase.state === "failed" || (phase.state === "done" && now - Date.parse(phase.at) < 15 * 60_000);
   const showSteps = running || recent;
+  // The steps fold away: open while a run is going (or just failed), folded once it's done, unless
+  // you open or close them yourself. A new run opens them again.
+  const [expanded, setExpanded] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (running) setExpanded(null);
+  }, [running]);
+  const stepsOpen = expanded ?? (running || phase.state === "failed");
 
   return (
     <section className="mx-4 mt-6">
@@ -72,6 +79,17 @@ export function RefreshCard() {
         )}
 
         {showSteps && (
+          <button
+            type="button"
+            aria-expanded={stepsOpen}
+            onClick={() => setExpanded(!stepsOpen)}
+            className="flex h-11 w-full items-center justify-between border-t hairline px-3.5 text-subhead font-medium text-tint"
+          >
+            {stepsOpen ? "Hide the steps" : `Show the steps${running ? "" : phase.state === "failed" ? " (stopped)" : " (all done)"}`}
+            <Icon name="chevronDown" size={14} stroke={2.6} className={cn("transition-transform duration-200", stepsOpen && "rotate-180")} />
+          </button>
+        )}
+        {showSteps && stepsOpen && (
           <ol className="border-t hairline px-3.5 py-3">
             {STEPS.map((s, i) => (
               <Step key={s.key} label={s.label} state={i < stepIndex ? "done" : i === stepIndex && running ? "now" : i === stepIndex && phase.state === "failed" ? "failed" : "todo"} detail={detail(s.key, status)} last={i === STEPS.length - 1}>

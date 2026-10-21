@@ -100,3 +100,32 @@ def test_status_follows_the_pipeline(client):
     assert s["pipeline"]["progress"]["plan"]["sources"] == ["devpost", "mlh"]
     assert s["pipeline"]["progress"]["enrich"] == {"enriched": 3, "dropped": 1}
     assert [(r["source"], r["fetched"], r["new"]) for r in s["sources"]] == [("devpost", 12, 3)]
+
+
+def test_tick_starts_the_due_run_once(client, monkeypatch):
+    from datetime import datetime, timezone
+
+    from app import refresh
+
+    # The last run was long before the latest slot: start one.
+    client.fake.runs["refresh.yml"] = [gh_run("completed", "success", created="2000-01-01T00:00:00Z")]
+    assert client.post("/schedule/tick").json()["started"] is True
+    assert client.fake.dispatched == 1
+    # One started since the slot (it's running, then finished): nothing more.
+    client.fake.runs["refresh.yml"] = [gh_run("in_progress", created=datetime.now(timezone.utc).isoformat())]
+    assert client.post("/schedule/tick").json()["started"] is False
+    client.fake.runs["refresh.yml"] = [gh_run("completed", "success", created=datetime.now(timezone.utc).isoformat())]
+    assert client.post("/schedule/tick").json()["started"] is False
+    assert client.fake.dispatched == 1
+
+
+def test_last_slot():
+    from datetime import datetime, timezone
+
+    from app.refresh import last_slot
+
+    at = lambda h, m: datetime(2026, 10, 21, h, m, tzinfo=timezone.utc)
+    assert last_slot(at(18, 17)) == at(18, 17)
+    assert last_slot(at(18, 16)) == at(12, 17)
+    assert last_slot(at(23, 59)) == at(18, 17)
+    assert last_slot(at(0, 5)) == datetime(2026, 10, 20, 18, 17, tzinfo=timezone.utc)

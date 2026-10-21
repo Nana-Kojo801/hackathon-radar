@@ -17,6 +17,7 @@ import { deadlineLabel, FORMAT_LABEL, prizeText } from "../src/lib/format";
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   SNAPSHOT_URL: string;
+  API_URL: string;
 }
 
 // Workers runtime globals (no @cloudflare/workers-types dependency for these few).
@@ -91,7 +92,29 @@ function tags(p: Preview): string {
   ].join("\n    ");
 }
 
+/**
+ * The 6-hourly refresh, on time. GitHub's own schedule started runs 3 to 6 hours late and skipped
+ * some, so the Worker's cron (wrangler.jsonc) asks the API to start the run that's due. The API
+ * does nothing if one already ran since the slot. The free API may take a minute to wake up.
+ */
+async function tick(env: Env): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${env.API_URL}/schedule/tick`, { method: "POST", signal: AbortSignal.timeout(90_000) });
+      console.log("schedule tick", res.status, await res.text());
+      if (res.ok) return;
+    } catch (e) {
+      console.log("schedule tick failed", String(e));
+    }
+    await new Promise((r) => setTimeout(r, 20_000));
+  }
+}
+
 export default {
+  async scheduled(_controller: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
+    ctx.waitUntil(tick(env));
+  },
+
   async fetch(request: Request, env: Env): Promise<Response> {
     const res = await env.ASSETS.fetch(request);
     if (request.method !== "GET" || !(res.headers.get("content-type") ?? "").includes("text/html")) return res;

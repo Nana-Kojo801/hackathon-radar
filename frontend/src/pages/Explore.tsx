@@ -368,7 +368,7 @@ function DeskFilters({ onAll }: { onAll: () => void }) {
         {pick("Prize", f.minPrize, f.minPrize !== "0", PRIZE_OPTIONS.map((o) => ({ value: o.value, label: o.value === "0" ? "Any" : `${o.label}+` })), (v) => set({ minPrize: v }), f.minPrize === "0" ? "Any" : `${compactMoney(Number(f.minPrize))}+`)}
         {toggle("Open worldwide", f.international === "international", () => set({ international: f.international === "international" ? "any" : "international" }))}
         {toggle("Hide student-only", f.student === "hide", () => set({ student: f.student === "hide" ? "any" : "hide" }))}
-        {toggle("New since last visit", f.newOnly, () => set({ newOnly: !f.newOnly }))}
+        {toggle("New today", f.newOnly, () => set({ newOnly: !f.newOnly }))}
         <button type="button" onClick={onAll} className={chipClass(extra > 0)}>
           <Icon name="filters" size={15} stroke={2.3} />
           All filters
@@ -437,7 +437,7 @@ function FilterSheet({ open, onOpenChange, count }: { open: boolean; onOpenChang
         <RowMenu label="Minimum prize" value={f.minPrize} options={PRIZE_OPTIONS} onChange={(v) => set({ minPrize: v })} />
         <RowToggle label="Open worldwide" checked={f.international === "international"} onChange={(v) => set({ international: v ? "international" : "any" })} />
         <RowToggle label="Hide student-only" checked={f.student === "hide"} onChange={(v) => set({ student: v ? "hide" : "any" })} />
-        <RowToggle label="Only new since last visit" checked={f.newOnly} onChange={(v) => set({ newOnly: v })} />
+        <RowToggle label="Only new today" checked={f.newOnly} onChange={(v) => set({ newOnly: v })} />
       </Group>
 
       <SheetLabel>Categories</SheetLabel>

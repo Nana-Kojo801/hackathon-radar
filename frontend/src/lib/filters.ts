@@ -105,7 +105,7 @@ export function saveFilters(f: Filters): void {
 /** The filters that narrow the list, each with a label and how to undo it (for the chips). */
 export function activeFilters(f: Filters): { key: string; label: string; clear: Partial<Filters> }[] {
   const out: { key: string; label: string; clear: Partial<Filters> }[] = [];
-  if (f.newOnly) out.push({ key: "new", label: "New", clear: { newOnly: false } });
+  if (f.newOnly) out.push({ key: "new", label: "New today", clear: { newOnly: false } });
   if (f.within !== "0") out.push({ key: "within", label: `Closes within ${WITHIN_OPTIONS.find((o) => o.value === f.within)?.label.toLowerCase()}`, clear: { within: "0" } });
   if (f.format !== "all") out.push({ key: "format", label: f.format === "online" ? "Online" : "In person", clear: { format: "all" } });
   if (f.minPrize !== "0") out.push({ key: "prize", label: `${compactMoney(Number(f.minPrize))}+`, clear: { minPrize: "0" } });
@@ -144,7 +144,7 @@ export function applyFilters(items: Hackathon[], f: Filters, newSince: string | 
       const d = daysLeft(h);
       if (d === null || d < 0 || d >= within) return false;
     }
-    if (f.newOnly && !(since ? Date.parse(h.first_seen_at) > since : isNew(h, firstRunAt))) return false;
+    if (f.newOnly && !(since ? Date.parse(h.first_seen_at) >= since : isNew(h, firstRunAt))) return false;
     if (q) {
       const hay = `${h.title} ${h.organizer ?? ""} ${h.summary ?? ""} ${h.location_text ?? ""} ${h.categories.join(" ")} ${h.categories.map(categoryLabel).join(" ")}`;
       if (!hay.toLowerCase().includes(q)) return false;
@@ -159,34 +159,12 @@ export function applyFilters(items: Hackathon[], f: Filters, newSince: string | 
   return out;
 }
 
-// ---------------------------------------------------------------- visits
+// ---------------------------------------------------------------- days
 
-const VISIT_KEY = "hackathon-radar:visits:v1";
-
-/**
- * "New since your last visit": the start of the previous visit, where a visit
- * is an app open more than an hour after the last one. Falls back to 48 hours.
- */
-export function lastVisit(): string | null {
-  try {
-    const v = JSON.parse(localStorage.getItem(VISIT_KEY) ?? "null") as { current: string; previous: string | null } | null;
-    const now = new Date();
-    if (!v) {
-      localStorage.setItem(VISIT_KEY, JSON.stringify({ current: now.toISOString(), previous: null }));
-      return null;
-    }
-    if (now.getTime() - Date.parse(v.current) > 3_600_000) {
-      localStorage.setItem(VISIT_KEY, JSON.stringify({ current: now.toISOString(), previous: v.current }));
-      return capVisit(v.current);
-    }
-    return capVisit(v.previous);
-  } catch {
-    return null;
-  }
-}
-
-/** A visit more than two weeks ago makes "new" meaningless; use the last 48 hours then. */
-function capVisit(iso: string | null): string | null {
-  if (!iso) return null;
-  return Date.now() - Date.parse(iso) > 14 * 86_400_000 ? null : iso;
+/** Midnight at the start of today on this device (or `daysAgo` days before), as ISO: "new today" counts from here. */
+export function dayStart(daysAgo = 0): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - daysAgo);
+  return d.toISOString();
 }

@@ -11,7 +11,7 @@ import { AppIcon, Icon, type IconName } from "./Icon";
 
 const SHORTCUTS: { label: string; dot: string; patch: Partial<Filters> }[] = [
   { label: "Closing this week", dot: "var(--orange-fill)", patch: { within: "7", sort: "deadline" } },
-  { label: "New since last visit", dot: "var(--accent)", patch: { newOnly: true } },
+  { label: "New today", dot: "var(--accent)", patch: { newOnly: true } },
   { label: "$50K+ prizes", dot: "#34C759", patch: { minPrize: "50000" } },
   { label: "Online", dot: "#AF52DE", patch: { format: "online" } },
 ];

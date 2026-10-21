@@ -27,6 +27,7 @@ app.include_router(push.router)
 app.include_router(push.public_router)
 app.include_router(stats.router)
 app.include_router(refresh.router)
+app.include_router(refresh.public_router)
 app.include_router(add.router)
 app.include_router(stats.public_router)
 

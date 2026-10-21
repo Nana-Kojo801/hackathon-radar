@@ -7,8 +7,8 @@ import { WeekRecap } from "../components/StatsTeasers";
 import { meta } from "../components/HackRow";
 import type { Hackathon } from "../lib/api";
 import { useDesktop } from "../lib/desktop";
-import { DEFAULT_FILTERS, type Filters } from "../lib/filters";
-import { bannerOf, countdown, daysLeft, iconOf, isNew, nextRefresh, prizeFull, prizeShort, timeAgo, todayLong, weekday, weekdayDate, fallbackArt, dueTag } from "../lib/format";
+import { dayStart, DEFAULT_FILTERS, type Filters } from "../lib/filters";
+import { bannerOf, countdown, daysLeft, iconOf, nextRefresh, prizeFull, prizeShort, timeAgo, todayLong, weekdayDate, fallbackArt, dueTag } from "../lib/format";
 import { press, rise, spring } from "../lib/motion";
 import { type Stage, usePersonal } from "../lib/personal";
 import { useRefresh } from "../lib/refresh";
@@ -36,18 +36,29 @@ export function Today() {
     return out.sort((a, b) => Date.parse(a.h.registration_deadline!) - Date.parse(b.h.registration_deadline!));
   }, [personal.items, d.live]);
 
-  const { closingWeek, featured, closingTop, fresh } = useMemo(() => {
+  const { closingWeek, featured, closingTop, fresh, freshToday, freshDay } = useMemo(() => {
     const mine = new Set(Object.keys(personal.items));
     const week = d.items.filter((h) => {
       const n = daysLeft(h);
       return n !== null && n >= 0 && n < 7;
     });
     const byPrize = [...week].filter((h) => !mine.has(h.id)).sort((a, b) => (b.prize_usd ?? -1) - (a.prize_usd ?? -1));
-    const since = d.newSince ? Date.parse(d.newSince) : null;
-    const isFresh = (h: Hackathon) => (since ? Date.parse(h.first_seen_at) > since : isNew(h, d.meta?.first_run_at ?? null));
-    const freshList = d.items.filter(isFresh).sort((a, b) => (b.prize_usd ?? -1) - (a.prize_usd ?? -1));
-    return { closingWeek: week, featured: byPrize[0] ?? null, closingTop: byPrize.slice(1, 6), fresh: freshList };
-  }, [d.items, d.newSince, d.meta, personal.items]);
+    // Everything found today, from every run since midnight. Before today's first finds (just after
+    // midnight), yesterday's, so the section isn't empty for the first hours of the day.
+    const today = Date.parse(d.newSince ?? dayStart());
+    const yesterday = Date.parse(dayStart(1));
+    const byPrizeDesc = (a: Hackathon, b: Hackathon) => (b.prize_usd ?? -1) - (a.prize_usd ?? -1);
+    const foundToday = d.items.filter((h) => Date.parse(h.first_seen_at) >= today).sort(byPrizeDesc);
+    const foundYesterday = foundToday.length ? [] : d.items.filter((h) => Date.parse(h.first_seen_at) >= yesterday && Date.parse(h.first_seen_at) < today).sort(byPrizeDesc);
+    return {
+      closingWeek: week,
+      featured: byPrize[0] ?? null,
+      closingTop: byPrize.slice(1, 6),
+      fresh: foundToday.length ? foundToday : foundYesterday,
+      freshToday: foundToday.length,
+      freshDay: foundToday.length || !foundYesterday.length ? ("today" as const) : ("yesterday" as const),
+    };
+  }, [d.items, d.newSince, personal.items]);
 
   const goExplore = (patch: Partial<Filters>) => {
     d.setFilters({ ...DEFAULT_FILTERS, sort: d.filters.sort, ...patch });
@@ -63,7 +74,9 @@ export function Today() {
   });
   const showWarning = !!d.warning && d.warning.key !== dismissed;
   // "today", "since yesterday", "since Monday": the section title's wording, for the summary tile.
-  const newLabel = freshTitle(d.newSince).replace(/^New (in the )?/, "");
+  const freshName = freshDay === "today" ? "New today" : "New yesterday";
+  // "See all" opens Explore's "New today" filter, so only for today's.
+  const seeAllNew = freshDay === "today" ? () => goExplore({ newOnly: true }) : undefined;
 
   const banners = (
     <AnimatePresence initial={false}>
@@ -90,7 +103,7 @@ export function Today() {
   );
   const glance = [
     { kicker: "Closing", icon: "clock" as IconName, tone: "text-orange", n: closingWeek.length, label: "this week", onClick: () => goExplore({ within: "7", sort: "deadline" }) },
-    { kicker: "New", icon: "plus" as IconName, tone: "text-tint", n: fresh.length, label: newLabel, onClick: () => goExplore({ newOnly: true }) },
+    { kicker: "New", icon: "plus" as IconName, tone: "text-tint", n: freshToday, label: "today", onClick: () => goExplore({ newOnly: true }) },
     { kicker: "Open", icon: "check" as IconName, tone: "text-green", n: d.items.length, label: "hackathons", onClick: () => goExplore({}) },
   ];
 
@@ -114,9 +127,9 @@ export function Today() {
               <NewGrid
                 loading={d.loading && !d.items.length}
                 fresh={fresh}
-                title={freshTitle(d.newSince)}
+                title={freshName}
                 lastRefresh={d.meta?.last_refresh ?? null}
-                onSeeAll={() => goExplore({ newOnly: true })}
+                onSeeAll={seeAllNew}
               />
               {closingTop.length > 0 && (
                 <>
@@ -183,9 +196,9 @@ export function Today() {
           <NewSection
             loading={d.loading && !d.items.length}
             fresh={fresh}
-            title={freshTitle(d.newSince)}
+            title={freshName}
             lastRefresh={d.meta?.last_refresh ?? null}
-            onSeeAll={() => goExplore({ newOnly: true })}
+            onSeeAll={seeAllNew}
           />
 
           <Glance loading={d.loading} cells={glance} />
@@ -393,17 +406,7 @@ function CompactRow({ h, index, last, stage }: { h: Hackathon; index: number; la
   );
 }
 
-/** "New today", "New since yesterday", "New since Monday": since the start of your previous visit. */
-function freshTitle(since: string | null): string {
-  if (!since) return "New in the last 2 days";
-  const day = (t: Date) => new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
-  const diff = Math.round((day(new Date()) - day(new Date(since))) / 86_400_000);
-  if (diff <= 0) return "New today";
-  if (diff === 1) return "New since yesterday";
-  return `New since ${weekday(since)}`;
-}
-
-function NewSection({ loading, fresh, title, lastRefresh, onSeeAll }: { loading: boolean; fresh: Hackathon[]; title: string; lastRefresh: string | null; onSeeAll: () => void }) {
+function NewSection({ loading, fresh, title, lastRefresh, onSeeAll }: { loading: boolean; fresh: Hackathon[]; title: string; lastRefresh: string | null; onSeeAll?: () => void }) {
   if (loading)
     return (
       <div className="mt-6 space-y-3 px-4">
@@ -435,7 +438,7 @@ function NewSection({ loading, fresh, title, lastRefresh, onSeeAll }: { loading:
   }
   return (
     <>
-      <SectionHeader title={title} eyebrow={<div className="text-footnote font-semibold tracking-[0.02em] text-tint uppercase">{fresh.length} found</div>} action={fresh.length > 3 ? `See all ${fresh.length}` : undefined} onAction={onSeeAll} />
+      <SectionHeader title={title} eyebrow={<div className="text-footnote font-semibold tracking-[0.02em] text-tint uppercase">{fresh.length} found</div>} action={onSeeAll && fresh.length > 3 ? `See all ${fresh.length}` : undefined} onAction={onSeeAll} />
       <div className="no-scrollbar snap-row flex gap-3.5 overflow-x-auto px-4 pb-2">
         {fresh.slice(0, 12).map((h, i) => (
           <Tile key={h.id} h={h} index={i} />
@@ -493,7 +496,7 @@ function DeskSection({ title, eyebrow, action, href, onAction }: { title: string
 }
 
 /** New listings as cards with their art, three to a row. */
-function NewGrid({ loading, fresh, title, lastRefresh, onSeeAll }: { loading: boolean; fresh: Hackathon[]; title: string; lastRefresh: string | null; onSeeAll: () => void }) {
+function NewGrid({ loading, fresh, title, lastRefresh, onSeeAll }: { loading: boolean; fresh: Hackathon[]; title: string; lastRefresh: string | null; onSeeAll?: () => void }) {
   if (loading)
     return (
       <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
@@ -525,7 +528,7 @@ function NewGrid({ loading, fresh, title, lastRefresh, onSeeAll }: { loading: bo
       <DeskSection
         title={title}
         eyebrow={<div className="text-footnote font-semibold tracking-[0.02em] text-tint uppercase">{fresh.length} found</div>}
-        action={fresh.length > 6 ? `See all ${fresh.length}` : undefined}
+        action={onSeeAll && fresh.length > 6 ? `See all ${fresh.length}` : undefined}
         onAction={onSeeAll}
       />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">

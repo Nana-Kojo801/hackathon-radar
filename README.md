@@ -133,6 +133,8 @@ Any of these works:
 
 A Postgres advisory lock stops two refreshes from running at once.
 
+**The schedule (every 6 hours, at 00:17, 06:17, 12:17 and 18:17 UTC)** is kept by the Cloudflare Worker, not GitHub: GitHub started its scheduled runs 3 to 6 hours late and skipped some. The Worker's cron (`triggers` in `frontend/wrangler.jsonc`) calls `POST /schedule/tick` on the API at each slot and again half an hour later; the API starts the refresh with its `GITHUB_TOKEN` only if none has started since the slot, so extra calls do nothing. GitHub's own schedule stays as a fallback and skips itself when a run already happened in the last 3 hours. Cron logs are in the Cloudflare dashboard under the Worker's Logs.
+
 **Check what Render is running:** open `https://<your-render-url>/health`. `commit` is the deployed commit (compare it with the latest on `main`) and `push` says whether `VAPID_PRIVATE_KEY` is set. `/push/key` returns the public key once push is set up; a 404 there means the deploy is older than the push feature.
 
 ## Frontend
