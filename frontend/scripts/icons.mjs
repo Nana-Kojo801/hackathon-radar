@@ -63,6 +63,7 @@ const ICONS = {
   send: "paper-plane-tilt",
   flag: "flag",
   sparkle: "sparkle",
+  trash: "trash",
 };
 
 /** Theme glyphs on art-less listings (lib/format.ts fallbackArt): fill weight only. */

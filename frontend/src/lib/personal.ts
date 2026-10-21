@@ -232,6 +232,13 @@ export function track(h: Hackathon, change: { status?: Stage | null; note?: stri
   else void sync();
 }
 
+/** Drop a hackathon from this device without telling the server (it was deleted there). */
+export function forget(id: string): void {
+  const items = { ...state.items };
+  delete items[id];
+  set({ items, pending: state.pending.filter((x) => x !== id) });
+}
+
 export function updateSettings(change: Partial<Settings>): void {
   set({
     settings: state.settings ? { ...state.settings, ...change } : state.settings,

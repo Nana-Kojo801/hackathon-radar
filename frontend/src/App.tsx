@@ -188,9 +188,10 @@ export default function App() {
   const warning = useMemo(() => healthWarning(meta), [meta]);
 
   const addLocal = useCallback((h: Hackathon) => setAll((prev) => [h, ...prev.filter((x) => x.id !== h.id)]), []);
+  const removeLocal = useCallback((id: string) => setAll((prev) => prev.filter((x) => x.id !== id)), []);
   const data: AppData = useMemo(
-    () => ({ items, live, meta, loading, slow, error, retry: () => setReload((n) => n + 1), filters, setFilters, newSince, categories, warning, addLocal }),
-    [items, live, meta, loading, slow, error, filters, setFilters, newSince, categories, warning, addLocal],
+    () => ({ items, live, meta, loading, slow, error, retry: () => setReload((n) => n + 1), filters, setFilters, newSince, categories, warning, addLocal, removeLocal }),
+    [items, live, meta, loading, slow, error, filters, setFilters, newSince, categories, warning, addLocal, removeLocal],
   );
 
   // ------------------------------------------------------------ badge

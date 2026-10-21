@@ -25,7 +25,8 @@ import {
 } from "../lib/format";
 import { useDesktop } from "../lib/desktop";
 import { bouncy, press, spring } from "../lib/motion";
-import { bannerRatio, loadDetail, rememberRatio } from "../lib/prefetch";
+import { openEdit } from "../lib/add";
+import { bannerRatio, DETAIL_EVENT, loadDetail, rememberRatio } from "../lib/prefetch";
 import { claudeUrl, ideasPrompt } from "../lib/prompt";
 import { parseBlocks, RichText } from "../lib/richtext";
 import { type Stage, track, usePersonal } from "../lib/personal";
@@ -60,7 +61,13 @@ export function Detail({ id, initial }: { id: string; initial?: Hackathon }) {
     loadDetail(id)
       .then((d) => !ctrl.signal.aborted && setDetail(d))
       .catch((e) => !ctrl.signal.aborted && setError(e instanceof Error ? e.message : String(e)));
-    return () => ctrl.abort();
+    // Edited here: show the saved copy at once.
+    const onEdit = (e: Event) => (e as CustomEvent<string>).detail === id && void loadDetail(id).then((d) => !ctrl.signal.aborted && setDetail(d));
+    window.addEventListener(DETAIL_EVENT, onEdit);
+    return () => {
+      ctrl.abort();
+      window.removeEventListener(DETAIL_EVENT, onEdit);
+    };
   }, [id, version]);
 
   useEffect(() => logView(id), [id]);
@@ -168,6 +175,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
               <Timeline h={h} />
               <ClaudeCard detail={detail} />
               <section className="card mx-4 mt-3 overflow-hidden rounded-[22px] [&>*:last-child_.row-line]:border-b-0">
+                <YourOwn h={h} detail={detail} />
                 {stage === "hidden" ? (
                   <ActionRow icon="undo" label="Show in lists again" onClick={() => track(h, { status: null })} />
                 ) : (
@@ -281,6 +289,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
         {detail && prizeItems(detail).length > 0 && <Prizes h={h} items={prizeItems(detail)} />}
 
         <section className="card mx-4 mt-6 overflow-hidden rounded-[22px] [&>*:last-child_.row-line]:border-b-0">
+          <YourOwn h={h} detail={detail} />
           <ActionRow icon="share" label="Share hackathon page" onClick={share} />
           {stage === "hidden" ? (
             <ActionRow icon="undo" label="Show in lists again" onClick={() => track(h, { status: null })} />
@@ -845,6 +854,17 @@ function About({ h, detail }: { h: Hackathon; detail: HackathonDetail | null }) 
         )}
       </div>
     </section>
+  );
+}
+
+/** Edit and Delete, on hackathons you added yourself. */
+function YourOwn({ h, detail }: { h: Hackathon; detail: HackathonDetail | null }) {
+  if (!h.added_by_user) return null;
+  return (
+    <>
+      <ActionRow icon="pencil" label="Edit details" onClick={() => openEdit(detail ?? h)} />
+      <ActionRow icon="trash" label="Delete hackathon" destructive onClick={() => openEdit(detail ?? h, { remove: true })} />
+    </>
   );
 }
 

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-import { API_URL, type Format, type Hackathon } from "./api";
+import { API_URL, type Format, type Hackathon, type HackathonDetail } from "./api";
 import { personalState } from "./personal";
 
 /**
@@ -22,6 +22,9 @@ export interface Candidate {
   description: string | null;
   /** Already on the radar: its id. */
   existing_id?: string | null;
+  /** Pictures from its page, shown while you pick and kept on the listing. */
+  banner_url?: string | null;
+  logo_url?: string | null;
 }
 
 export class AddError extends Error {}
@@ -30,22 +33,23 @@ export class AddError extends Error {}
  * One request, with the server's own explanation on failure. Finding takes a while (a search,
  * reading pages, the AI), so the wait is long; a sleeping server gets one more try.
  */
-async function request<T>(path: string, body: unknown): Promise<T> {
+async function request<T>(path: string, body: unknown, method = "POST"): Promise<T> {
   const key = personalState().key;
   if (!key) throw new AddError("Connect this device in Settings first.");
   for (let attempt = 0; ; attempt++) {
     let res: Response;
     try {
       res = await fetch(`${API_URL}${path}`, {
-        method: "POST",
-        headers: { "X-Personal-Key": key, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        method,
+        headers: { "X-Personal-Key": key, ...(body ? { "Content-Type": "application/json" } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(100_000),
       });
     } catch {
       if (attempt < 1) continue;
       throw new AddError("Couldn't reach the server. It may be waking up; try again in a minute.");
     }
+    if (res.status === 204) return undefined as T;
     if (res.ok) return (await res.json()) as T;
     const detail = await res
       .json()
@@ -66,9 +70,46 @@ export function addHackathon(c: Candidate): Promise<{ hackathon: Hackathon; crea
   return request("/me/add", body);
 }
 
+/** Change a hackathon you added; returns it as its page shows it. */
+export function editHackathon(id: string, c: Candidate): Promise<HackathonDetail> {
+  const { existing_id: _, ...body } = c;
+  return request(`/me/add/${id}`, body, "PATCH");
+}
+
+export function deleteHackathon(id: string): Promise<void> {
+  return request(`/me/add/${id}`, null, "DELETE");
+}
+
+/** A listing's fields as the form edits them. */
+export function toCandidate(h: Hackathon | HackathonDetail): Candidate {
+  const day = (iso: string | null) => iso?.slice(0, 10) ?? null;
+  return {
+    title: h.title,
+    url: h.source_url,
+    organizer: h.organizer,
+    prize_text: h.prize_text,
+    location_text: h.location_text,
+    dates_text: null,
+    start_date: day(h.start_date),
+    end_date: day(h.end_date),
+    registration_deadline: day(h.registration_deadline),
+    format: h.format,
+    description: ("description" in h ? h.description : null) ?? h.summary,
+    banner_url: h.banner_url ?? null,
+    logo_url: h.logo_url ?? h.icon_url ?? null,
+  };
+}
+
 // ---------------------------------------------------------------- the sheet, opened from anywhere
 
-let open: { text: string; seq: number } | null = null;
+export interface SheetRequest {
+  text: string;
+  seq: number;
+  /** Editing a hackathon you added (or, with remove, confirming its deletion). */
+  edit?: { id: string; c: Candidate; remove?: boolean };
+}
+
+let open: SheetRequest | null = null;
 let seq = 0;
 const listeners = new Set<() => void>();
 
@@ -78,12 +119,18 @@ export function openAdd(text = ""): void {
   listeners.forEach((l) => l());
 }
 
+/** Open the sheet to edit a hackathon you added, or straight at "delete it?". */
+export function openEdit(h: Hackathon | HackathonDetail, opts: { remove?: boolean } = {}): void {
+  open = { text: "", seq: ++seq, edit: { id: h.id, c: toCandidate(h), remove: opts.remove } };
+  listeners.forEach((l) => l());
+}
+
 export function closeAdd(): void {
   open = null;
   listeners.forEach((l) => l());
 }
 
-export function useAddSheet(): { text: string; seq: number } | null {
+export function useAddSheet(): SheetRequest | null {
   return useSyncExternalStore(
     (l) => {
       listeners.add(l);

@@ -45,6 +45,14 @@ def client(monkeypatch):
     monkeypatch.setattr(add, "search", fake_search)
     monkeypatch.setattr(add, "read", lambda url, http: (url, "", ""))
     monkeypatch.setattr(add, "finish", lambda hid: calls["finished"].append(hid))
+    monkeypatch.setattr(add, "publish", lambda: calls.__setitem__("published", calls["published"] + 1))
+
+    def fake_pictures(cands):
+        for c in cands:
+            if not c.get("existing_id"):
+                c["banner_url"], c["logo_url"] = "https://img.example/banner.jpg", "https://img.example/logo.png"
+
+    monkeypatch.setattr(add, "pictures", fake_pictures)
     c = db.connect()
     db.migrate(c)
     with c.cursor() as cur:
@@ -90,6 +98,7 @@ def test_a_name_is_searched_and_known_ones_are_marked(client):
     assert r.status_code == 200 and body["searched"]
     assert client.calls["search"] == ["hackerrank openai hackathon hackathon"]
     assert [c["existing_id"] for c in body["candidates"]] == [None, hid]
+    assert body["candidates"][0]["banner_url"] == "https://img.example/banner.jpg"
 
 
 def test_a_linkedin_post_is_searched_by_the_words_in_its_link(client):
@@ -148,3 +157,43 @@ def test_the_ai_check_never_hides_one_you_added(client):
         enrich._apply(cur, row, res)
         cur.execute("SELECT is_hidden FROM hackathons WHERE id = %s", (hid,))
         assert cur.fetchone()["is_hidden"] is False
+
+
+def test_pictures_found_while_picking_are_kept(client):
+    h = client.post("/me/add", headers=KEY, json=candidate(banner_url="https://img.example/b.jpg", logo_url="https://img.example/l.png")).json()["hackathon"]
+    assert h["banner_url"] == "https://img.example/b.jpg" and h["logo_url"] == "https://img.example/l.png"
+
+
+def test_you_can_edit_one_you_added(client):
+    hid = client.post("/me/add", headers=KEY, json=candidate()).json()["hackathon"]["id"]
+    client.calls["finished"].clear()
+    r = client.patch(f"/me/add/{hid}", headers=KEY, json=candidate(title="Orchestrate", prize_text="$2,400", registration_deadline="2099-10-25",
+                                                                   format="hybrid", description="A 24-hour agent hackathon."))
+    assert r.status_code == 200
+    d = r.json()
+    assert d["title"] == "Orchestrate" and d["prize_text"] == "$2,400" and d["format"] == "hybrid"
+    assert d["registration_deadline"].startswith("2099-10-25") and d["description"] == "A 24-hour agent hackathon."
+    assert d["summary"] == "A 24-hour agent hackathon."
+    assert client.calls["finished"] == [hid]
+
+
+def test_only_yours_can_be_edited_or_deleted(client):
+    other = _insert_listing()
+    assert client.patch(f"/me/add/{other}", headers=KEY, json=candidate()).status_code == 404
+    assert client.delete(f"/me/add/{other}", headers=KEY).status_code == 404
+
+
+def test_an_edit_cant_take_another_listings_link(client):
+    _insert_listing()
+    hid = client.post("/me/add", headers=KEY, json=candidate()).json()["hackathon"]["id"]
+    r = client.patch(f"/me/add/{hid}", headers=KEY, json=candidate(url="https://devpost.com/x"))
+    assert r.status_code == 409
+
+
+def test_deleting_removes_it_and_your_progress(client):
+    hid = client.post("/me/add", headers=KEY, json=candidate()).json()["hackathon"]["id"]
+    assert client.put(f"/me/hackathons/{hid}", headers=KEY, json={"status": "saved", "note": "team"}).status_code == 200
+    assert client.delete(f"/me/add/{hid}", headers=KEY).status_code == 204
+    assert client.get("/hackathons").json()["items"] == []
+    assert client.get("/me", headers=KEY).json()["items"] == []
+    assert client.calls["published"] == 1

@@ -8,6 +8,7 @@
   added_by_user: shown in Explore at once, never dropped by the AI check, never sent to you as an
   alert. Then, in the background, the AI fills in the summary, prize and themes, the artwork step
   looks for a banner and logo, and the public snapshot is republished so it shows everywhere.
+- PATCH /me/add/{id}, DELETE /me/add/{id}: change or delete a hackathon you added (only those).
 
 Same tools as web discovery (pipeline/discover.py): Tavily search, the page reader, OpenAI.
 """
@@ -15,17 +16,20 @@ Same tools as web discovery (pipeline/discover.py): Tavily search, the page read
 import logging
 import re
 from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor
 from typing import Literal
 from urllib.parse import urlsplit
+from uuid import UUID
 
 import httpx
 from bs4 import BeautifulSoup
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field
 
 from pipeline import ai, artwork, dedupe, discover, enrich, store
 from pipeline.dates import parse_iso
-from pipeline.http import HEADERS
+from pipeline.http import HEADERS, PoliteClient
 from pipeline.normalize import canonical_url, clean_text, normalize
 from pipeline.types import RawListing
 
@@ -87,6 +91,9 @@ class Candidate(BaseModel):
     registration_deadline: str | None = None
     format: Literal["online", "in_person", "hybrid", "unknown"] = "unknown"
     description: str | None = Field(default=None, max_length=2000)
+    # Found on its page while you picked it (find), kept so the listing has them from the start.
+    banner_url: str | None = Field(default=None, max_length=2000)
+    logo_url: str | None = Field(default=None, max_length=2000)
 
 
 # ---------------------------------------------------------------- reading pages
@@ -194,7 +201,46 @@ def _raw(c: dict) -> RawListing:
         end_date=parse_iso(c.get("end_date")),
         registration_deadline=parse_iso(c.get("registration_deadline")),
         format=c.get("format") if c.get("format") != "unknown" else None,
+        banner_url=_http(c.get("banner_url")),
     )
+
+
+def _http(url: str | None) -> str | None:
+    return url if url and url.startswith(("http://", "https://")) else None
+
+
+def pictures(cands: list[dict]) -> None:
+    """A banner and a logo for each new candidate, from its page, to show while you pick one."""
+    todo = [c for c in cands if not c.get("existing_id")]
+    if not todo:
+        return
+    http = PoliteClient(delay=0.2, timeout=8)
+
+    def one(c: dict) -> None:
+        try:
+            head = artwork.read_page(http, c["url"])
+            if not head:
+                return
+            images = [u for u in head.images[:2] if not artwork.PLACEHOLDER.search(u)]
+            c["banner_url"] = next((u for u in images if artwork.is_banner(http, u)), None)
+            c["logo_url"] = artwork.best_logo(http, head) or next((u for u in images if artwork.is_icon(http, u)), None)
+        except Exception as e:  # pictures are a nicety: never fail the search for them
+            log.info("add: no pictures for %s: %s", c["url"], e)
+
+    try:
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            list(pool.map(one, todo))
+    finally:
+        http.close()
+
+
+def _art(cur, hackathon_id) -> dict:
+    cur.execute(
+        "SELECT COALESCE(banner_url, page_image_url) AS banner_url, COALESCE(icon_url, logo_url) AS logo_url"
+        " FROM hackathons WHERE id = %s",
+        (hackathon_id,),
+    )
+    return cur.fetchone() or {"banner_url": None, "logo_url": None}
 
 
 def existing(cur, c: dict) -> str | None:
@@ -216,6 +262,7 @@ def _known(cur, url: str) -> dict | None:
         "start_date": _day(row["start_date"]), "end_date": _day(row["end_date"]),
         "registration_deadline": _day(row["registration_deadline"]), "format": row["format"] or "unknown",
         "description": row["summary"] or clean_text(row["description_raw"], 400), "existing_id": str(row["id"]),
+        **_art(cur, row["id"]),
     }
 
 
@@ -289,8 +336,11 @@ def find(body: FindBody) -> dict:
             c = {k: c.get(k) for k in FIELDS}
             c["format"] = c.get("format") or "unknown"
             c["existing_id"] = existing(cur, c)
+            c.update(_art(cur, c["existing_id"]) if c["existing_id"] else {"banner_url": None, "logo_url": None})
             candidates.append(c)
-    return {"candidates": candidates[:3], "searched": searched}
+    candidates = candidates[:3]
+    pictures(candidates)
+    return {"candidates": candidates, "searched": searched}
 
 
 # ---------------------------------------------------------------- adding
@@ -317,8 +367,9 @@ def add(body: Candidate, background: BackgroundTasks) -> dict:
         cur.execute(
             # A web find the AI hasn't vetted yet counts as yours too, so it shows now.
             "UPDATE hackathons SET is_hidden = false, last_seen_at = now(),"
-            " added_by_user = added_by_user OR %s OR (source = 'web' AND enriched_at IS NULL) WHERE id = %s",
-            (created, row["id"]),
+            " added_by_user = added_by_user OR %s OR (source = 'web' AND enriched_at IS NULL),"
+            " logo_url = CASE WHEN %s THEN COALESCE(logo_url, %s) ELSE logo_url END WHERE id = %s",
+            (created, created, _http(c.get("logo_url")), row["id"]),
         )
         store.refresh_statuses(cur)
         cur.execute(f"SELECT {LIST_COLUMNS} FROM hackathons WHERE id = %s", (row["id"],))
@@ -326,6 +377,71 @@ def add(body: Candidate, background: BackgroundTasks) -> dict:
     if created:
         background.add_task(finish, str(row["id"]))
     return {"hackathon": hackathon, "created": created}
+
+
+# ---------------------------------------------------------------- editing and deleting yours
+
+
+@router.patch("/add/{hackathon_id}")
+def edit(hackathon_id: UUID, body: Candidate, background: BackgroundTasks) -> dict:
+    """Change a hackathon you added. The AI then reads it again (summary, prize amount, themes)."""
+    from .main import get_hackathon
+
+    c = body.model_dump()
+    if not c["url"].startswith(("http://", "https://")):
+        raise HTTPException(422, "The link must start with http:// or https://")
+    n = normalize(_raw(c))
+    r = n.raw
+    with db.cursor() as cur:
+        cur.execute("SELECT id, hints FROM hackathons WHERE id = %s AND added_by_user", (hackathon_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Only hackathons you added can be edited.")
+        other = dedupe.find_by_url(cur, n.source_url)
+        if other and other["id"] != row["id"]:
+            raise HTTPException(409, f"“{other['title']}” on the radar already uses that link.")
+        hints = dict(row["hints"] or {})
+        if r.format:
+            hints["format"] = r.format
+        else:
+            hints.pop("format", None)
+        cur.execute(
+            """
+            UPDATE hackathons SET
+                title = %(title)s, title_key = %(key)s, source_url = %(url)s, organizer = %(org)s,
+                prize_text = %(prize)s, location_text = %(loc)s,
+                start_date = %(start)s, end_date = %(end)s, registration_deadline = %(deadline)s,
+                format = COALESCE(%(format)s, 'unknown'), hints = %(hints)s,
+                -- A new description replaces the AI's summary and tidied text until it reads it again.
+                summary = CASE WHEN description_raw IS DISTINCT FROM %(desc)s THEN %(summary)s ELSE summary END,
+                about_md = CASE WHEN description_raw IS DISTINCT FROM %(desc)s THEN NULL ELSE about_md END,
+                description_raw = %(desc)s,
+                banner_url = COALESCE(%(banner)s, banner_url), logo_url = COALESCE(%(logo)s, logo_url),
+                content_hash = %(hash)s, last_seen_at = now()
+            WHERE id = %(id)s
+            """,
+            {
+                "id": row["id"], "title": r.title, "key": n.title_key, "url": n.source_url, "org": r.organizer,
+                "prize": r.prize_text, "loc": r.location_text, "start": r.start_date, "end": r.end_date,
+                "deadline": r.registration_deadline, "format": r.format, "hints": Jsonb(hints),
+                "desc": r.description, "summary": clean_text(r.description, 400), "banner": r.banner_url,
+                "logo": _http(c.get("logo_url")), "hash": n.content_hash,
+            },
+        )
+        store.refresh_statuses(cur)
+    background.add_task(finish, str(hackathon_id))
+    return get_hackathon(hackathon_id)
+
+
+@router.delete("/add/{hackathon_id}", status_code=204)
+def remove(hackathon_id: UUID, background: BackgroundTasks) -> Response:
+    """Delete a hackathon you added, with your progress and note on it."""
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM hackathons WHERE id = %s AND added_by_user RETURNING id", (hackathon_id,))
+        if not cur.fetchone():
+            raise HTTPException(404, "Only hackathons you added can be deleted.")
+    background.add_task(publish)
+    return Response(status_code=204)
 
 
 def finish(hackathon_id: str) -> None:

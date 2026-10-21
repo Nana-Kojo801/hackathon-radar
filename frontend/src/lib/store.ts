@@ -22,6 +22,8 @@ export interface AppData {
   warning: { key: string; text: string } | null;
   /** Show a hackathon you just added before the published list has it. */
   addLocal: (h: Hackathon) => void;
+  /** Take out a hackathon you deleted. */
+  removeLocal: (id: string) => void;
 }
 
 export const DataContext = createContext<AppData | null>(null);

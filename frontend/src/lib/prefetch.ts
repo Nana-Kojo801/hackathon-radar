@@ -22,6 +22,13 @@ export function loadDetail(id: string): Promise<HackathonDetail> {
   return promise;
 }
 
+/** A page changed here (you edited it): use this copy, and tell an open page. */
+export const DETAIL_EVENT = "radar:detail";
+export function putDetail(d: HackathonDetail): void {
+  details.set(d.id, { at: Date.now(), promise: Promise.resolve(d) });
+  window.dispatchEvent(new CustomEvent(DETAIL_EVENT, { detail: d.id }));
+}
+
 /** Drop the loaded pages (a newer list is out), so they're read again. */
 export function forgetDetails(): void {
   details.clear();

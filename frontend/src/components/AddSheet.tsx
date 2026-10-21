@@ -1,10 +1,11 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { AddError, addHackathon, type Candidate, closeAdd, findHackathon, useAddSheet } from "../lib/add";
+import { AddError, addHackathon, type Candidate, closeAdd, deleteHackathon, editHackathon, findHackathon, useAddSheet } from "../lib/add";
 import type { Format } from "../lib/api";
-import { hostOf } from "../lib/format";
-import { personalState, track, usePersonal } from "../lib/personal";
-import { linkTo, navigate } from "../lib/router";
+import { fallbackArt, hostOf } from "../lib/format";
+import { forget, personalState, track, usePersonal } from "../lib/personal";
+import { putDetail } from "../lib/prefetch";
+import { goBack, linkTo, navigate } from "../lib/router";
 import { checkForNewData, useData } from "../lib/store";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
@@ -37,6 +38,9 @@ export function AddSheet() {
   const [draft, setDraft] = useState<Candidate | null>(null);
   const [adding, setAdding] = useState(false);
   const [startedAt, setStartedAt] = useState(0);
+  // Editing a hackathon you added, and whether its deletion is being confirmed.
+  const [editId, setEditId] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const run = useRef(0);
 
   const find = async (t: string) => {
@@ -68,7 +72,12 @@ export function AddSheet() {
     setFound([]);
     setDraft(null);
     setAdding(false);
-    if (req.text.trim() && personalState().key) void find(req.text);
+    setEditId(req.edit?.id ?? null);
+    setConfirmRemove(!!req.edit?.remove);
+    if (req.edit) {
+      setDraft(req.edit.c);
+      setPhase("results");
+    } else if (req.text.trim() && personalState().key) void find(req.text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [req?.seq]);
 
@@ -96,6 +105,41 @@ export function AddSheet() {
     }
   };
 
+  const save = async () => {
+    if (!draft || !editId) return;
+    setAdding(true);
+    setError(null);
+    try {
+      const updated = await editHackathon(editId, draft);
+      putDetail(updated);
+      d.addLocal(updated);
+      close();
+      toast("Changes saved", "check");
+      // The AI reads it again (summary, prize amount, themes) and the list is republished.
+      for (const s of [25, 50, 90]) window.setTimeout(checkForNewData, s * 1000);
+    } catch (e) {
+      setError(e instanceof AddError ? e.message : "Couldn't save the changes. Try again.");
+      setAdding(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!editId) return;
+    setAdding(true);
+    setError(null);
+    try {
+      await deleteHackathon(editId);
+      forget(editId);
+      d.removeLocal(editId);
+      close();
+      if (window.location.pathname === `/h/${editId}`) goBack();
+      toast("Hackathon deleted", "check");
+    } catch (e) {
+      setError(e instanceof AddError ? e.message : "Couldn't delete it. Try again.");
+      setAdding(false);
+    }
+  };
+
   const openExisting = (id: string) => {
     const h = d.live.get(id);
     if (h) track(h, { status: "saved" });
@@ -105,7 +149,27 @@ export function AddSheet() {
   };
 
   const footer =
-    phase === "results" && draft ? (
+    editId && draft ? (
+      confirmRemove ? (
+        <div className="flex gap-2.5">
+          <PrimaryButton tone="fill" onClick={() => setConfirmRemove(false)} disabled={adding} className="flex-1">
+            Keep it
+          </PrimaryButton>
+          <button
+            type="button"
+            onClick={() => void remove()}
+            disabled={adding}
+            className="flex h-[52px] flex-1 items-center justify-center rounded-full bg-red-fill text-body font-semibold text-white disabled:opacity-45"
+          >
+            {adding ? "Deleting…" : "Delete"}
+          </button>
+        </div>
+      ) : (
+        <PrimaryButton onClick={() => void save()} disabled={adding || !draft.title.trim() || !/^https?:\/\/\S+\.\S+/.test(draft.url)} className="w-full">
+          {adding ? "Saving…" : "Save changes"}
+        </PrimaryButton>
+      )
+    ) : phase === "results" && draft ? (
       draft.existing_id ? (
         <PrimaryButton onClick={() => openExisting(draft.existing_id!)} className="w-full">
           Open and save it
@@ -125,11 +189,11 @@ export function AddSheet() {
     <Sheet
       open={!!req}
       onOpenChange={(v) => !v && close()}
-      title="Add a hackathon"
-      description="Find a hackathon from a link or its name and add it to your list."
+      title={editId ? (confirmRemove ? "Delete hackathon" : "Edit hackathon") : "Add a hackathon"}
+      description={editId ? "Change or delete a hackathon you added." : "Find a hackathon from a link or its name and add it to your list."}
       left={<GlassButton label="Close" icon="close" size={40} onClick={close} />}
       right={
-        phase === "results" ? (
+        phase === "results" && !editId ? (
           <button type="button" onClick={() => setPhase("input")} className="h-10 rounded-full bg-fill px-3.5 text-subhead font-semibold">
             Search again
           </button>
@@ -145,6 +209,32 @@ export function AddSheet() {
             Open Settings
           </a>
         </div>
+      ) : editId && draft ? (
+        confirmRemove ? (
+          <div className="px-2 pt-1 pb-2">
+            <Art c={draft} />
+            <p className="mx-2 mt-4 text-callout font-semibold">Delete “{draft.title}”?</p>
+            <p className="mx-2 mt-1 text-subhead text-label-2">It goes from Explore and from your list, with your progress and note on it. This can't be undone.</p>
+            {error && <p role="alert" className="mx-2 mt-2 text-subhead text-red">{error}</p>}
+          </div>
+        ) : (
+          <div className="px-1 pt-1">
+            <Art c={draft} />
+            <div className="mt-4">
+              <Form c={draft} onChange={setDraft} intro="Change anything here. The AI reads it again afterwards to update the summary, prize amount and themes." />
+            </div>
+            {error && (
+              <p role="alert" className="mx-3 mt-3 flex gap-1.5 text-subhead text-red">
+                <Icon name="alert" size={17} className="mt-0.5 shrink-0" />
+                {error}
+              </p>
+            )}
+            <button type="button" onClick={() => setConfirmRemove(true)} className="mx-auto mt-5 mb-1 flex items-center gap-1.5 text-subhead font-semibold text-red">
+              <Icon name="trash" size={16} />
+              Delete this hackathon
+            </button>
+          </div>
+        )
       ) : phase === "input" ? (
         <div className="px-1 pt-1">
           <label className="block">
@@ -207,6 +297,7 @@ export function AddSheet() {
                     <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full", i === pick ? "bg-accent text-on-accent" : "shadow-[inset_0_0_0_1.5px_var(--label-3)]")}>
                       {i === pick && <Icon name="check" size={12} stroke={3} />}
                     </span>
+                    <Thumbnail c={c} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-callout font-semibold">{c.title}</span>
                       <span className="block truncate text-footnote text-label-2">{hostOf(c.url)}</span>
@@ -217,7 +308,12 @@ export function AddSheet() {
               </div>
             </div>
           )}
-          {draft && (draft.existing_id ? <AlreadyThere c={draft} /> : <Form c={draft} onChange={setDraft} />)}
+          {draft && (
+            <>
+              <Art c={draft} />
+              <div className="mt-4">{draft.existing_id ? <AlreadyThere c={draft} /> : <Form c={draft} onChange={setDraft} />}</div>
+            </>
+          )}
           {error && (
             <p role="alert" className="mx-3 mt-3 flex gap-1.5 text-subhead text-red">
               <Icon name="alert" size={17} className="mt-0.5 shrink-0" />
@@ -290,7 +386,7 @@ function AlreadyThere({ c }: { c: Candidate }) {
 }
 
 /** The details the AI read, to check and correct. Anything it didn't find is empty, never guessed. */
-function Form({ c, onChange }: { c: Candidate; onChange: (c: Candidate) => void }) {
+function Form({ c, onChange, intro }: { c: Candidate; onChange: (c: Candidate) => void; intro?: string }) {
   const set = (patch: Partial<Candidate>) => onChange({ ...c, ...patch });
   const text = (key: keyof Candidate, label: string, opts: { type?: string; long?: boolean } = {}) => {
     const value = (c[key] as string | null) ?? "";
@@ -319,7 +415,7 @@ function Form({ c, onChange }: { c: Candidate; onChange: (c: Candidate) => void 
   };
   return (
     <>
-      <p className="mx-3 mb-2 text-footnote text-label-2">Check what the AI found. Empty fields weren't on the page; fill in what you know.</p>
+      <p className="mx-3 mb-2 text-footnote text-label-2">{intro ?? "Check what the AI found. Empty fields weren't on the page; fill in what you know."}</p>
       <div className="card overflow-hidden rounded-[18px]">
         {text("title", "Name")}
         {text("url", "Link", { type: "url" })}
@@ -334,5 +430,56 @@ function Form({ c, onChange }: { c: Candidate; onChange: (c: Candidate) => void 
       <span className="mx-3 mt-4 mb-1.5 block text-footnote font-medium text-label-2 uppercase">Format</span>
       <Segmented label="Format" value={c.format} onChange={(v) => set({ format: v })} options={FORMATS} />
     </>
+  );
+}
+
+/** The pictures found on its page: the banner across, the logo on top. Nothing found: a plain tile. */
+function Art({ c }: { c: Candidate }) {
+  const [bannerOk, setBannerOk] = useState(true);
+  const [logoOk, setLogoOk] = useState(true);
+  useEffect(() => {
+    setBannerOk(true);
+    setLogoOk(true);
+  }, [c.banner_url, c.logo_url]);
+  const banner = bannerOk ? c.banner_url : null;
+  const logo = logoOk ? c.logo_url : null;
+  const art = fallbackArt({ categories: [], id: c.url });
+  return (
+    <div className="relative h-[150px] overflow-hidden rounded-[20px]" style={{ background: banner ? "#0e0e12" : art.gradient }}>
+      {banner ? (
+        <img src={banner} alt="" onError={() => setBannerOk(false)} className="absolute inset-0 h-full w-full object-cover" />
+      ) : !logo ? (
+        <div className="absolute inset-0 flex items-center justify-center text-white/90">
+          <svg width="56" height="56" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
+            <path d={art.glyph} />
+          </svg>
+        </div>
+      ) : null}
+      {logo && (
+        <span className={cn("absolute flex items-center justify-center overflow-hidden rounded-[16px] bg-white shadow-[0_8px_20px_-6px_rgba(0,0,0,0.45)]", banner ? "bottom-3 left-3 h-14 w-14" : "top-1/2 left-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2")}>
+          <img src={logo} alt="" onError={() => setLogoOk(false)} className="h-full w-full object-contain p-[14%]" />
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** A candidate's small picture in the "Which one?" list. */
+function Thumbnail({ c }: { c: Candidate }) {
+  // The logo, else a crop of the banner (also when the logo won't load), else a plain tile.
+  const [failed, setFailed] = useState<string[]>([]);
+  const src = [c.logo_url, c.banner_url].find((u): u is string => !!u && !failed.includes(u)) ?? null;
+  const isLogo = !!src && src === c.logo_url;
+  const art = fallbackArt({ categories: [], id: c.url });
+  return (
+    <span className="thumb-line flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[11px] text-white" style={{ background: src ? (isLogo ? "#fff" : "#0e0e12") : art.gradient }}>
+      {src ? (
+        <img key={src} src={src} alt="" onError={() => setFailed((f) => [...f, src])} className={cn("h-full w-full", isLogo ? "object-contain p-[14%]" : "object-cover")} />
+      ) : (
+        <svg width="22" height="22" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
+          <path d={art.glyph} />
+        </svg>
+      )}
+    </span>
   );
 }
