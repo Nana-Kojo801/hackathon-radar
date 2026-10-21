@@ -31,6 +31,7 @@ import { parseBlocks, RichText } from "../lib/richtext";
 import { type Stage, track, usePersonal } from "../lib/personal";
 import { linkTo } from "../lib/router";
 import { logView } from "../lib/stats";
+import { useData } from "../lib/store";
 import { copyText, toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 
@@ -45,15 +46,22 @@ export function Detail({ id, initial }: { id: string; initial?: Hackathon }) {
   const [detail, setDetail] = useState<HackathonDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Read again when a newer list is published (a hackathon you just added gets its artwork and
+  // details a little later), keeping what's shown until the new copy arrives.
+  const version = useData().meta?.generated_at;
+  const shownId = useRef<string | null>(null);
   useEffect(() => {
     const ctrl = new AbortController();
-    setDetail(null);
-    setError(null);
+    if (shownId.current !== id) {
+      shownId.current = id;
+      setDetail(null);
+      setError(null);
+    }
     loadDetail(id)
       .then((d) => !ctrl.signal.aborted && setDetail(d))
       .catch((e) => !ctrl.signal.aborted && setError(e instanceof Error ? e.message : String(e)));
     return () => ctrl.abort();
-  }, [id]);
+  }, [id, version]);
 
   useEffect(() => logView(id), [id]);
 

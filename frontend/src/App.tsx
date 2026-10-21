@@ -7,6 +7,7 @@ import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
 import { fetchData, fetchJSON, type Hackathon, type Meta } from "./lib/api";
 import { openAdd } from "./lib/add";
+import { forgetDetails } from "./lib/prefetch";
 import { appearance, useAppearance } from "./lib/appearance";
 import { DEFAULT_FILTERS, type Filters, lastVisit, loadFilters, saveFilters } from "./lib/filters";
 import { isDesktop, useDesktop } from "./lib/desktop";
@@ -97,6 +98,8 @@ export default function App() {
 
   useEffect(() => {
     const ctrl = new AbortController();
+    // A newer list: hackathon pages loaded earlier are reloaded too.
+    if (reload) forgetDetails();
     setLoading(true);
     setError(null);
     setSlow(false);
@@ -134,14 +137,19 @@ export default function App() {
   // A refresh lands every 6 hours (or when you run one). The list is loaded once, so check the snapshot
   // when the app comes back to the screen and every few minutes, and reload when a newer one is out:
   // otherwise "last refreshed" and "next refresh" kept showing the old run until the app was reopened.
-  const lastRefresh = useRef<string | null | undefined>(undefined);
-  lastRefresh.current = meta?.last_refresh;
+  // A republish without a refresh (after you add a hackathon, its artwork and details) changes only
+  // when the snapshot was built, so that counts too.
+  const shownMeta = useRef<Meta | null>(null);
+  shownMeta.current = meta;
   useEffect(() => {
     const check = () => {
-      if (document.visibilityState !== "visible" || lastRefresh.current === undefined) return;
+      const cur = shownMeta.current;
+      if (document.visibilityState !== "visible" || !cur) return;
       fetchData<Meta>("meta.json", "/meta")
         .then((m) => {
-          if (m.last_refresh && m.last_refresh !== lastRefresh.current) setReload((n) => n + 1);
+          const refreshed = !!m.last_refresh && m.last_refresh !== cur.last_refresh;
+          const rebuilt = !!m.generated_at && !!cur.generated_at && m.generated_at !== cur.generated_at;
+          if (refreshed || rebuilt) setReload((n) => n + 1);
         })
         .catch(() => undefined);
     };

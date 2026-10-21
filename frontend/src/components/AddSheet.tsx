@@ -5,7 +5,7 @@ import type { Format } from "../lib/api";
 import { hostOf } from "../lib/format";
 import { personalState, track, usePersonal } from "../lib/personal";
 import { linkTo, navigate } from "../lib/router";
-import { useData } from "../lib/store";
+import { checkForNewData, useData } from "../lib/store";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
@@ -88,6 +88,8 @@ export function AddSheet() {
       close();
       navigate(`/h/${r.hackathon.id}`);
       toast(r.created ? "Added and saved" : "Saved", "bookmark");
+      // The server finds its artwork and details and republishes the list within a minute or so.
+      if (r.created) for (const s of [25, 50, 90, 150]) window.setTimeout(checkForNewData, s * 1000);
     } catch (e) {
       setError(e instanceof AddError ? e.message : "Couldn't add it. Try again.");
       setAdding(false);

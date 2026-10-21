@@ -22,6 +22,11 @@ export function loadDetail(id: string): Promise<HackathonDetail> {
   return promise;
 }
 
+/** Drop the loaded pages (a newer list is out), so they're read again. */
+export function forgetDetails(): void {
+  details.clear();
+}
+
 /** The banner's width / height once it has been seen, so its header is the right height from the start. */
 export function bannerRatio(url: string): number | undefined {
   return ratios.get(url);
