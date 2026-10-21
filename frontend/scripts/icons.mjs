@@ -67,6 +67,20 @@ const ICONS = {
   female: "gender-female",
   lightning: "lightning",
   users: "users",
+  // Spotlight types on Today (lib/spotlights.ts).
+  student: "student",
+  plant: "plant",
+  buildings: "buildings",
+  briefcase: "briefcase",
+  cpu: "cpu",
+  cube: "cube",
+  leaf: "leaf",
+  heartbeat: "heartbeat",
+  game: "game-controller",
+  shield: "shield-check",
+  robot: "robot",
+  hourglass: "hourglass",
+  target: "target",
 };
 
 /** Theme glyphs on art-less listings (lib/format.ts fallbackArt): fill weight only. */
