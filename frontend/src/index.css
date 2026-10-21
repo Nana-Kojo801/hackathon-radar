@@ -10,6 +10,8 @@
 @theme inline {
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
   --breakpoint-wide: 900px;
+  /* Desktop layout (lib/desktop.ts): a sidebar instead of the tab bar, and wider pages. */
+  --breakpoint-desk: 1024px;
 
   --color-bg: var(--bg);
   --color-card: var(--card);

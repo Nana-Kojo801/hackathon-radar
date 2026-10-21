@@ -5,6 +5,7 @@ import { bouncy, press, rise } from "../lib/motion";
 import { usePersonal } from "../lib/personal";
 import { linkTo } from "../lib/router";
 import { useMyStats } from "../lib/stats";
+import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
 
 /**
@@ -69,7 +70,7 @@ export function StatsCard() {
 }
 
 /** "Your week" on Today, for a connected device with some activity. */
-export function WeekRecap() {
+export function WeekRecap({ className }: { className?: string }) {
   const p = usePersonal();
   const me = useMyStats();
   usePreload();
@@ -84,7 +85,7 @@ export function WeekRecap() {
     [r.registered, "registered"],
   ];
   return (
-    <motion.a href="/settings/stats" onClick={linkTo("/settings/stats")} whileTap={press} transition={bouncy} className="card mx-4 mt-8 block rounded-[22px] p-4">
+    <motion.a href="/settings/stats" onClick={linkTo("/settings/stats")} whileTap={press} transition={bouncy} className={cn("card mx-4 mt-8 block rounded-[22px] p-4", className)}>
       <span className="flex items-center gap-2.5">
         <span className="flex h-8 w-8 items-center justify-center rounded-[9px] text-on-accent" style={{ background: statsGradient }}>
           <Icon name="chart" size={18} stroke={2.5} />

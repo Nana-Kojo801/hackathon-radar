@@ -23,7 +23,7 @@ export function TabBar({ active, hidden, badge, onReselect }: { active: Tab; hid
   return (
     <nav
       aria-label="Tabs"
-      className="glass fixed bottom-[max(14px,calc(env(safe-area-inset-bottom)-6px))] left-1/2 z-40 h-[62px] w-[calc(100%-40px)] max-w-[420px] rounded-full p-1"
+      className="glass fixed desk:hidden bottom-[max(14px,calc(env(safe-area-inset-bottom)-6px))] left-1/2 z-40 h-[62px] w-[calc(100%-40px)] max-w-[420px] rounded-full p-1"
       style={{
         transform: `translate3d(-50%, ${hidden ? 140 : 0}px, 0)`,
         opacity: hidden ? 0 : 1,

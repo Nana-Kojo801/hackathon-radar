@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { createContext, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { Hackathon } from "../lib/api";
-import { dueTag, fallbackArt, iconOf } from "../lib/format";
+import { bannerOf, dueTag, fallbackArt, iconOf } from "../lib/format";
 import { bouncy, press, pressSmall, spring } from "../lib/motion";
 import { slide } from "../lib/transition";
 import { type Stage, stageLabel } from "../lib/personal";
@@ -162,11 +162,25 @@ export function LargeTitle({ eyebrow, title, subtitle, accessory }: { eyebrow?: 
   );
 }
 
+/** A desktop page's title row (phones use LargeTitle and the CompactBar). */
+export function DeskHeader({ eyebrow, title, subtitle, accessory }: { eyebrow?: ReactNode; title: string; subtitle?: ReactNode; accessory?: ReactNode }) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      <div className="min-w-0">
+        {eyebrow && <div className="text-footnote font-semibold tracking-[0.02em] text-label-2 uppercase">{eyebrow}</div>}
+        <h1 className="text-[34px] leading-tight font-bold tracking-[-0.028em]">{title}</h1>
+        {subtitle && <div className="mt-0.5 text-subhead text-label-2">{subtitle}</div>}
+      </div>
+      {accessory && <div className="flex shrink-0 flex-wrap items-center gap-3">{accessory}</div>}
+    </header>
+  );
+}
+
 /** The slim bar that fades in once the large title scrolls away. */
 export function CompactBar({ title, show, left, right }: { title: string; show: boolean; left?: ReactNode; right?: ReactNode }) {
   return (
     // While its tab slides, the tab (transformed) becomes what "fixed" is relative to; --tab-scroll keeps the bar at the top of the screen.
-    <div aria-hidden={!show} className={cn("fixed inset-x-0 top-[var(--tab-scroll,0px)] z-30", !show && "pointer-events-none")}>
+    <div aria-hidden={!show} className={cn("fixed inset-x-0 top-[var(--tab-scroll,0px)] z-30 desk:hidden", !show && "pointer-events-none")}>
       <BarBacking show={show} />
       <div className="relative px-4 pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-11 max-w-[720px] items-center justify-between gap-3">
@@ -236,6 +250,7 @@ export function RowLink({
   destructive,
   tinted,
   chevron = true,
+  active,
 }: {
   icon?: IconName;
   iconBg?: string;
@@ -248,6 +263,8 @@ export function RowLink({
   destructive?: boolean;
   tinted?: boolean;
   chevron?: boolean;
+  /** The page open beside the list (desktop Settings). */
+  active?: boolean;
 }) {
   const inner = (
     <>
@@ -262,7 +279,7 @@ export function RowLink({
       </span>
     </>
   );
-  const cls = "flex w-full items-center gap-3.5 pl-4 text-left outline-none transition-colors active:bg-fill";
+  const cls = cn("flex w-full items-center gap-3.5 pl-4 text-left outline-none transition-colors active:bg-fill desk:hover:bg-[color-mix(in_srgb,var(--card)_95%,var(--label))]", active && "bg-soft desk:hover:bg-soft");
   if (href)
     return (
       <a
@@ -648,6 +665,43 @@ export function Thumb({ h, size, radius, className, contain }: { h: Hackathon; s
         </svg>
       )}
     </span>
+  );
+}
+
+/**
+ * A hackathon's wide art for a card or header: its banner (a much wider strip shown whole over a
+ * blurred stretch of itself), else its icon centred on a blurred wash of itself, else its gradient.
+ */
+export function Cover({ h, className, iconSize = 64, children }: { h: Hackathon; className?: string; iconSize?: number; children?: ReactNode }) {
+  const [failed, setFailed] = useState(false);
+  const [ratio, setRatio] = useState(1.9);
+  const banner = failed ? null : bannerOf(h);
+  const icon = iconOf(h);
+  const strip = ratio > 2.6;
+  return (
+    <div className={cn("relative overflow-hidden", className)} style={{ background: banner || icon ? "#0e0e12" : fallbackArt(h).gradient }}>
+      {banner ? (
+        <>
+          {strip && <img src={banner} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-125 object-cover opacity-80 blur-2xl saturate-150" />}
+          <img
+            src={banner}
+            alt=""
+            loading="lazy"
+            onLoad={(e) => setRatio(e.currentTarget.naturalWidth / Math.max(1, e.currentTarget.naturalHeight))}
+            onError={() => setFailed(true)}
+            className={cn("absolute inset-0 h-full w-full", strip ? "object-contain" : "object-cover")}
+          />
+        </>
+      ) : (
+        <>
+          {icon && !icon.logo && <img src={icon.src} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-150 object-cover opacity-60 blur-2xl saturate-150" />}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Thumb h={h} size={iconSize} radius={Math.round(iconSize * 0.24)} className="shadow-[0_10px_26px_-8px_rgba(0,0,0,0.5)]" />
+          </div>
+        </>
+      )}
+      {children}
+    </div>
   );
 }
 

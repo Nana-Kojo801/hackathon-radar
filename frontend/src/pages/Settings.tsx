@@ -2,7 +2,8 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
 import { AppIcon, Icon } from "../components/Icon";
-import { CompactBar, Group, LargeTitle, Menu, RowLink, RowMenu, RowToggle, useScrolled } from "../components/kit";
+import { CompactBar, DeskHeader, Group, LargeTitle, Menu, RowLink, RowMenu, RowToggle, useScrolled } from "../components/kit";
+import { InlinePage } from "../components/OverlayPage";
 import { RefreshCard } from "../components/RefreshCard";
 import { StatsCard } from "../components/StatsTeasers";
 import { ACCENTS, setAppearance, type StartTab, useAppearance } from "../lib/appearance";
@@ -10,7 +11,12 @@ import { compactMoney, countdown, nextRefresh, timeAgo } from "../lib/format";
 import { bouncy, press, spring } from "../lib/motion";
 import { connect, disconnect, KeyError, type Settings as ServerSettings, updateSettings, usePersonal } from "../lib/personal";
 import { usePushStatus } from "../lib/push";
+import { useDesktop } from "../lib/desktop";
+import { parse, usePath } from "../lib/router";
 import { useData } from "../lib/store";
+import { AppearancePage } from "./Appearance";
+import { EmailAlertsPage } from "./EmailAlerts";
+import { NotificationsPage } from "./Notifications";
 import { cn } from "../lib/utils";
 
 const REMINDER_OPTIONS = [
@@ -46,11 +52,14 @@ export function SettingsTab() {
   const accentName = look.accent === "custom" ? "Custom" : (ACCENTS.find((a) => a.id === look.accent)?.name ?? "");
   const themeName = look.theme === "system" ? "Automatic" : look.theme === "dark" ? "Dark" : "Light";
   const failing = d.warning;
+  const desktop = useDesktop();
+  const path = usePath();
+  // On a desktop the settings pages open beside the list; Appearance until another is picked.
+  const kind = parse(path).overlay?.kind;
+  const pane = desktop ? (kind === "notifications" || kind === "email" ? kind : "appearance") : null;
 
-  return (
-    <div className="pb-36">
-      <CompactBar title="Settings" show={scrolled} />
-      <LargeTitle title="Settings" />
+  const list = (
+    <>
 
       {p.key ? (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={spring} className="card mx-4 mt-4 flex items-center gap-3.5 rounded-[22px] p-3.5">
@@ -70,8 +79,8 @@ export function SettingsTab() {
 
       <div className={cn(off && "pointer-events-none opacity-50")} aria-disabled={off}>
         <Group header="Alerts">
-          <RowLink icon="bell" iconBg="#FF3B30" label="Notifications" value={push === "on" ? "On" : "Off"} href="/settings/notifications" />
-          <RowLink icon="mail" iconBg="#007AFF" label="Email alerts" value={emailSummary(s)} href="/settings/email" />
+          <RowLink icon="bell" iconBg="#FF3B30" label="Notifications" value={push === "on" ? "On" : "Off"} href="/settings/notifications" active={pane === "notifications"} />
+          <RowLink icon="mail" iconBg="#007AFF" label="Email alerts" value={emailSummary(s)} href="/settings/email" active={pane === "email"} />
           <RowMenu
             icon="clock"
             iconBg="#FF9500"
@@ -85,7 +94,7 @@ export function SettingsTab() {
       </div>
 
       <Group header="Make it yours">
-        <RowLink icon="palette" iconBg="#FF2D55" label="Appearance" value={`${themeName}, ${accentName}`} href="/settings/appearance" />
+        <RowLink icon="palette" iconBg="#FF2D55" label="Appearance" value={`${themeName}, ${accentName}`} href="/settings/appearance" active={pane === "appearance"} />
         <RowMenu icon="home" iconBg="#34C759" label="Open the app on" value={look.startTab} options={START_OPTIONS} onChange={(v) => setAppearance({ startTab: v })} />
       </Group>
 
@@ -112,6 +121,30 @@ export function SettingsTab() {
           />
         </div>
       )}
+    </>
+  );
+
+  if (desktop)
+    return (
+      <div className="mx-auto max-w-[1160px] px-10 pt-8 pb-16">
+        <DeskHeader title="Settings" />
+        <div className="mt-2 flex items-start gap-8">
+          {/* The list keeps its phone margins; the negative margin lines it up with the title. */}
+          <div className="-mx-4 w-[400px] shrink-0">{list}</div>
+          <section aria-label="Settings page" className="-mx-4 min-w-0 flex-1 basis-0 pt-2">
+            <InlinePage.Provider value={true}>
+              {pane === "notifications" ? <NotificationsPage /> : pane === "email" ? <EmailAlertsPage /> : <AppearancePage />}
+            </InlinePage.Provider>
+          </section>
+        </div>
+      </div>
+    );
+
+  return (
+    <div className="pb-36">
+      <CompactBar title="Settings" show={scrolled} />
+      <LargeTitle title="Settings" />
+      {list}
     </div>
   );
 }

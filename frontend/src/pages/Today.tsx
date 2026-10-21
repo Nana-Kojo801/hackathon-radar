@@ -1,15 +1,17 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 import { Icon, type IconName } from "../components/Icon";
-import { Banner, CompactBar, DueTag, GlassButton, LargeTitle, PrimaryButton, SectionHeader, StageTag, Thumb, useScrolled } from "../components/kit";
+import { Banner, CompactBar, Cover, DeskHeader, DueTag, GlassButton, LargeTitle, PrimaryButton, SectionHeader, StageTag, Thumb, useScrolled } from "../components/kit";
 import { WeekRecap } from "../components/StatsTeasers";
 import { meta } from "../components/HackRow";
 import type { Hackathon } from "../lib/api";
+import { useDesktop } from "../lib/desktop";
 import { DEFAULT_FILTERS, type Filters } from "../lib/filters";
-import { bannerOf, daysLeft, iconOf, isNew, nextRefresh, prizeFull, prizeShort, todayLong, weekday, weekdayDate, fallbackArt, dueTag } from "../lib/format";
+import { bannerOf, countdown, daysLeft, iconOf, isNew, nextRefresh, prizeFull, prizeShort, timeAgo, todayLong, weekday, weekdayDate, fallbackArt, dueTag } from "../lib/format";
 import { press, rise, spring } from "../lib/motion";
 import { type Stage, usePersonal } from "../lib/personal";
+import { useRefresh } from "../lib/refresh";
 import { linkTo, navigate } from "../lib/router";
 import { requestSearchFocus, useData } from "../lib/store";
 import { cn } from "../lib/utils";
@@ -18,6 +20,7 @@ const DISMISSED = "hackathon-radar:dismissed-warning";
 
 export function Today() {
   const d = useData();
+  const desktop = useDesktop();
   const personal = usePersonal();
   const scrolled = useScrolled(52);
 
@@ -61,6 +64,89 @@ export function Today() {
   // "today", "since yesterday", "since Monday": the section title's wording, for the summary tile.
   const newLabel = freshTitle(d.newSince).replace(/^New (in the )?/, "");
 
+  const banners = (
+    <AnimatePresence initial={false}>
+      {showWarning && (
+        <Banner
+          onDismiss={() => {
+            setDismissed(d.warning!.key);
+            try {
+              sessionStorage.setItem(DISMISSED, d.warning!.key);
+            } catch {
+              /* ignore */
+            }
+          }}
+        >
+          {d.warning!.text}
+        </Banner>
+      )}
+      {d.slow && d.loading && (
+        <Banner icon="refresh" tone="accent">
+          <span className="font-semibold">Waking up the server…</span> <span className="text-label-2">It sleeps when idle on the free plan. This takes up to a minute.</span>
+        </Banner>
+      )}
+    </AnimatePresence>
+  );
+  const glance = [
+    { kicker: "Closing", icon: "clock" as IconName, tone: "text-orange", n: closingWeek.length, label: "this week", onClick: () => goExplore({ within: "7", sort: "deadline" }) },
+    { kicker: "New", icon: "plus" as IconName, tone: "text-tint", n: fresh.length, label: newLabel, onClick: () => goExplore({ newOnly: true }) },
+    { kicker: "Open", icon: "check" as IconName, tone: "text-green", n: d.items.length, label: "hackathons", onClick: () => goExplore({}) },
+  ];
+
+  if (desktop) {
+    // Two columns: what's new and closing on the left; the numbers, your deadlines and the biggest prize in a rail.
+    return (
+      <div className="mx-auto max-w-[1160px] px-10 pt-8 pb-16">
+        <DeskHeader eyebrow={todayLong()} title="Today" accessory={<RefreshNow />} />
+        <div className="-mx-4">{banners}</div>
+        {d.error && !d.items.length ? (
+          <div className="card mt-6 rounded-[22px] px-5 py-10 text-center">
+            <p className="text-body font-semibold">Couldn't load hackathons</p>
+            <p className="mt-1 text-subhead text-label-2">The server didn't answer ({d.error}).</p>
+            <PrimaryButton onClick={d.retry} className="mx-auto mt-4 h-11 text-subhead">
+              Try again
+            </PrimaryButton>
+          </div>
+        ) : (
+          <div className="mt-6 flex items-start gap-7">
+            <div className="min-w-0 flex-1">
+              <NewGrid
+                loading={d.loading && !d.items.length}
+                fresh={fresh}
+                title={freshTitle(d.newSince)}
+                lastRefresh={d.meta?.last_refresh ?? null}
+                onSeeAll={() => goExplore({ newOnly: true })}
+              />
+              {closingTop.length > 0 && (
+                <>
+                  <DeskSection title="Closing this week" action={`See all ${closingWeek.length}`} onAction={() => goExplore({ within: "7", sort: "deadline" })} />
+                  <ul className="card overflow-hidden rounded-[22px]">
+                    {closingTop.map((h, i) => (
+                      <CompactRow key={h.id} h={h} index={i} last={i === closingTop.length - 1} stage={personal.items[h.id]?.status ?? null} />
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+            <aside aria-label="At a glance" className="flex w-[340px] shrink-0 flex-col gap-5">
+              <Glance loading={d.loading} cells={glance} className="mx-0 mt-0" />
+              <DeadlineList tracked={tracked} />
+              {featured && (
+                <div>
+                  <div className={cn("mb-2 text-footnote font-semibold tracking-[0.02em] uppercase", dueTag(featured).tone === "red" ? "text-red" : "text-orange")}>
+                    Biggest prize this week · {dueTag(featured).text}
+                  </div>
+                  <Hero h={featured} className="mx-0" stacked />
+                </div>
+              )}
+              <WeekRecap className="mx-0 mt-0" />
+            </aside>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="pb-32">
       <CompactBar title="Today" show={scrolled} />
@@ -80,27 +166,7 @@ export function Today() {
         }
       />
 
-      <AnimatePresence initial={false}>
-        {showWarning && (
-          <Banner
-            onDismiss={() => {
-              setDismissed(d.warning!.key);
-              try {
-                sessionStorage.setItem(DISMISSED, d.warning!.key);
-              } catch {
-                /* ignore */
-              }
-            }}
-          >
-            {d.warning!.text}
-          </Banner>
-        )}
-        {d.slow && d.loading && (
-          <Banner icon="refresh" tone="accent">
-            <span className="font-semibold">Waking up the server…</span> <span className="text-label-2">It sleeps when idle on the free plan. This takes up to a minute.</span>
-          </Banner>
-        )}
-      </AnimatePresence>
+      {banners}
 
       {d.error && !d.items.length ? (
         <div className="card mx-4 mt-6 rounded-[22px] px-5 py-8 text-center">
@@ -121,14 +187,7 @@ export function Today() {
             onSeeAll={() => goExplore({ newOnly: true })}
           />
 
-          <Glance
-            loading={d.loading}
-            cells={[
-              { kicker: "Closing", icon: "clock", tone: "text-orange", n: closingWeek.length, label: "this week", onClick: () => goExplore({ within: "7", sort: "deadline" }) },
-              { kicker: "New", icon: "plus", tone: "text-tint", n: fresh.length, label: newLabel, onClick: () => goExplore({ newOnly: true }) },
-              { kicker: "Open", icon: "check", tone: "text-green", n: d.items.length, label: "hackathons", onClick: () => goExplore({}) },
-            ]}
-          />
+          <Glance loading={d.loading} cells={glance} />
 
           <SectionHeader title="Your deadlines" action={tracked.length ? "All saved" : undefined} href="/saved" />
           {tracked.length ? (
@@ -183,9 +242,9 @@ export function Today() {
   );
 }
 
-function Glance({ cells, loading }: { loading: boolean; cells: { kicker: string; icon: IconName; tone: string; n: number; label: string; onClick: () => void }[] }) {
+function Glance({ cells, loading, className }: { loading: boolean; className?: string; cells: { kicker: string; icon: IconName; tone: string; n: number; label: string; onClick: () => void }[] }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={spring} className="card mx-4 mt-4 grid grid-cols-3 rounded-[22px]">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={spring} className={cn("card mx-4 mt-4 grid grid-cols-3 rounded-[22px]", className)}>
       {cells.map((c, i) => (
         <motion.button
           key={c.kicker}
@@ -245,7 +304,7 @@ function DeadlineCard({ h, status, days, index }: { h: Hackathon; status: Stage;
 }
 
 /** A wide banner fills the card; otherwise the square icon sits on a blurred wash of itself. */
-function Hero({ h }: { h: Hackathon }) {
+function Hero({ h, className, stacked }: { h: Hackathon; className?: string; stacked?: boolean }) {
   const [bannerFailed, setBannerFailed] = useState(false);
   const [failed, setFailed] = useState(false);
   const banner = bannerFailed ? null : bannerOf(h);
@@ -264,7 +323,7 @@ function Hero({ h }: { h: Hackathon }) {
       animate={{ opacity: 1, y: 0 }}
       transition={spring}
       whileTap={press}
-      className="card mx-4 block overflow-hidden rounded-[26px]"
+      className={cn("card mx-4 block overflow-hidden rounded-[26px]", className)}
     >
       <div className="relative h-[184px] overflow-hidden" style={{ background: src ? "var(--card-2)" : art.gradient }}>
         {src ? (
@@ -298,12 +357,12 @@ function Hero({ h }: { h: Hackathon }) {
           {dueTag(h).text}
         </span>
       </div>
-      <div className="flex items-end gap-3 px-4 pt-3.5 pb-4">
+      <div className={cn("flex gap-3 px-4 pt-3.5 pb-4", stacked ? "flex-col gap-2" : "items-end")}>
         <div className="min-w-0 flex-1">
           <div className="line-clamp-2 text-title3 font-bold tracking-[-0.02em]">{h.title}</div>
           <div className="mt-0.5 truncate text-subhead text-label-2">{meta(h)}</div>
         </div>
-        <div className="shrink-0 text-right">
+        <div className={cn("shrink-0", !stacked && "text-right")}>
           <div className="text-[calc(22px*var(--ts))] leading-tight font-bold tracking-[-0.025em] tabular">{prizeFull(h)}</div>
           <div className="text-caption text-label-2">prize pool</div>
         </div>
@@ -406,5 +465,165 @@ function TodaySkeleton() {
       <div className="skeleton mt-6 h-6 w-40 rounded-md" />
       <div className="skeleton h-[230px] rounded-[22px]" />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- desktop
+
+function DeskSection({ title, eyebrow, action, href, onAction }: { title: string; eyebrow?: ReactNode; action?: string; href?: string; onAction?: () => void }) {
+  return (
+    <div className="mt-8 mb-3 flex items-end justify-between gap-3 first:mt-0">
+      <div className="min-w-0">
+        {eyebrow}
+        <h2 className="text-title2 font-bold tracking-[-0.022em]">{title}</h2>
+      </div>
+      {action &&
+        (href ? (
+          <a href={href} onClick={linkTo(href)} className="mb-0.5 shrink-0 text-subhead font-medium text-tint hover:underline">
+            {action}
+          </a>
+        ) : (
+          <button type="button" onClick={onAction} className="mb-0.5 shrink-0 text-subhead font-medium text-tint hover:underline">
+            {action}
+          </button>
+        ))}
+    </div>
+  );
+}
+
+/** New listings as cards with their art, three to a row. */
+function NewGrid({ loading, fresh, title, lastRefresh, onSeeAll }: { loading: boolean; fresh: Hackathon[]; title: string; lastRefresh: string | null; onSeeAll: () => void }) {
+  if (loading)
+    return (
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="skeleton h-[260px] rounded-[20px]" />
+        ))}
+      </div>
+    );
+  if (!fresh.length) {
+    const next = nextRefresh(lastRefresh);
+    const at = new Date(next.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return (
+      <>
+        <DeskSection title={title.replace(/^New/, "Nothing new")} />
+        <div className="card flex items-center gap-4 rounded-[22px] px-5 py-5">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-soft text-tint">
+            <Icon name="refresh" size={24} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-callout font-semibold">You're up to date</p>
+            <p className="text-footnote text-label-2">{next.due ? "The radar is checking for new hackathons now." : `The radar checks again around ${at}.`}</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+  return (
+    <>
+      <DeskSection
+        title={title}
+        eyebrow={<div className="text-footnote font-semibold tracking-[0.02em] text-tint uppercase">{fresh.length} found</div>}
+        action={fresh.length > 6 ? `See all ${fresh.length}` : undefined}
+        onAction={onSeeAll}
+      />
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+        {fresh.slice(0, 6).map((h, i) => (
+          <motion.a
+            key={h.id}
+            href={`/h/${h.id}`}
+            onClick={linkTo(`/h/${h.id}`)}
+            {...rise(i, 4)}
+            className="card flex flex-col overflow-hidden rounded-[20px] transition-transform duration-200 hover:-translate-y-0.5"
+          >
+            <Cover h={h} className="h-[132px]">
+              <span className="absolute top-2.5 left-2.5 flex h-[22px] items-center rounded-full bg-accent px-2 text-[11px] font-bold tracking-[0.04em] text-on-accent">NEW</span>
+            </Cover>
+            <div className="flex flex-1 flex-col gap-0.5 px-4 pt-3 pb-4">
+              <div className="line-clamp-2 text-callout leading-[1.3] font-semibold tracking-[-0.015em]">{h.title}</div>
+              <div className="truncate text-footnote text-label-2">{meta(h)}</div>
+              <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+                <span className="text-body font-bold tracking-[-0.02em] tabular">{prizeShort(h)}</span>
+                <DueTag h={h} />
+              </div>
+            </div>
+          </motion.a>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/** Your saved and registered hackathons by deadline, with how much of the last two weeks is used up. */
+function DeadlineList({ tracked }: { tracked: { h: Hackathon; status: Stage; days: number }[] }) {
+  return (
+    <section className="card rounded-[22px] px-4 pt-4 pb-1.5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-headline font-semibold tracking-[-0.02em]">Your deadlines</h2>
+        {tracked.length > 0 && (
+          <a href="/saved" onClick={linkTo("/saved")} className="text-subhead font-medium text-tint hover:underline">
+            All saved
+          </a>
+        )}
+      </div>
+      {tracked.length ? (
+        <ul className="mt-1">
+          {tracked.slice(0, 5).map((t, i) => {
+            const urgent = t.days <= 1;
+            return (
+              <li key={t.h.id} className={cn(i > 0 && "border-t hairline")}>
+                <a href={`/h/${t.h.id}`} onClick={linkTo(`/h/${t.h.id}`)} className="block py-3 hover:opacity-80">
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="line-clamp-2 text-subhead font-semibold">{t.h.title}</span>
+                    <StageTag status={t.status} />
+                  </span>
+                  <span className="mt-1 flex justify-between text-footnote text-label-2">
+                    <span>Closes {weekdayDate(t.h.registration_deadline)}</span>
+                    <span className={cn("font-semibold tabular", urgent ? "text-red" : t.days < 7 ? "text-orange" : "text-label")}>{t.days === 0 ? "Today" : `${t.days} ${t.days === 1 ? "day" : "days"}`}</span>
+                  </span>
+                  <span className="mt-2 block h-1 overflow-hidden rounded-full bg-track">
+                    <span className={cn("block h-full rounded-full", urgent ? "bg-red-fill" : t.days < 7 ? "bg-orange-fill" : "bg-accent")} style={{ width: `${Math.min(1, Math.max(0.06, 1 - t.days / 14)) * 100}%` }} />
+                  </span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="pt-1 pb-3.5 text-footnote text-label-2">Nothing saved yet. Save a hackathon from Explore and its countdown shows up here.</p>
+      )}
+    </section>
+  );
+}
+
+/** When the list was last refreshed, and a button to run the search now (once this device is connected). */
+function RefreshNow() {
+  const d = useData();
+  const p = usePersonal();
+  const last = d.meta?.last_refresh;
+  const next = nextRefresh(last);
+  const label = `Refreshed ${timeAgo(last)}${next.due ? "" : ` · next in ${countdown(next.at - Date.now())}`}`;
+  return (
+    <>
+      <span className="text-footnote text-label-2">{last ? label : ""}</span>
+      {p.key && <RefreshButton />}
+    </>
+  );
+}
+
+function RefreshButton() {
+  const { phase, start, starting } = useRefresh();
+  const running = phase.state === "running" || starting;
+  return (
+    <motion.button
+      type="button"
+      whileTap={press}
+      onClick={() => !running && start()}
+      disabled={running}
+      className="flex h-10 items-center gap-2 rounded-full bg-fill px-4 text-subhead font-semibold text-label disabled:opacity-70"
+    >
+      <Icon name="refresh" size={17} className={running ? "animate-spin" : undefined} />
+      {running ? "Refreshing…" : "Refresh now"}
+    </motion.button>
   );
 }

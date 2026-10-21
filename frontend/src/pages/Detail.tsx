@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { ClaudeMark, Icon, type IconName } from "../components/Icon";
-import { GlassButton, Menu, Thumb } from "../components/kit";
+import { Cover, GlassButton, Menu, StageTag, Thumb } from "../components/kit";
 import { OverlayPage } from "../components/OverlayPage";
 import { fromPlatform, Prizes } from "../components/Prizes";
 import { fetchData, type Hackathon, type HackathonDetail } from "../lib/api";
@@ -23,10 +23,12 @@ import {
   timeUtc,
   weekdayDate,
 } from "../lib/format";
+import { useDesktop } from "../lib/desktop";
 import { bouncy, press, spring } from "../lib/motion";
 import { claudeUrl, ideasPrompt } from "../lib/prompt";
 import { parseBlocks, RichText } from "../lib/richtext";
 import { type Stage, track, usePersonal } from "../lib/personal";
+import { linkTo } from "../lib/router";
 import { logView } from "../lib/stats";
 import { copyText, toast } from "../lib/toast";
 import { cn } from "../lib/utils";
@@ -94,23 +96,84 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
   const BANNER_H = bannerHeight(bannerRatio);
   const icon = iconOf(h)?.src ?? null;
 
-  const share = async () => {
-    const url = h.source_url;
-    if (window.matchMedia("(pointer: coarse)").matches && typeof navigator.share === "function") {
-      try {
-        await navigator.share({ title: h.title, text: `${h.title}\n${prizeShort(h)} prize pool\n\n${url}` });
-        return;
-      } catch (e) {
-        if ((e as DOMException).name === "AbortError") return;
-      }
-    }
-    if (await copyText(url)) toast("Link copied", "check");
-  };
+  const share = () => shareHackathon(h);
+  const desktop = useDesktop();
 
   const toggleSave = () => {
     track(h, { status: saved ? null : "saved" });
     toast(saved ? "Removed from Saved" : "Saved", "bookmark");
   };
+
+  if (desktop) {
+    // The banner across the top, then the facts and the event on the left, and what you do about it on the right.
+    return (
+      <OverlayPage title={h.title} wide right={<SaveShare saved={saved} onSave={toggleSave} onShare={share} />}>
+        <div className="px-10 pb-16">
+          <Cover h={h} iconSize={112} className="h-[280px] rounded-[26px]" />
+          <motion.header initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={spring} className="mt-5 flex flex-wrap items-end justify-between gap-5 px-2">
+            <div className="flex min-w-0 flex-1 basis-[520px] items-end gap-5">
+              {banner && <Thumb h={h} size={104} radius={24} className="-mt-[76px] shadow-[0_0_0_5px_var(--bg),0_14px_30px_-10px_rgba(0,0,0,0.45)]" />}
+              <div className="min-w-0">
+                <h1 className="text-[30px] leading-tight font-bold tracking-[-0.026em]">{h.title}</h1>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {h.organizer && <span className="mr-1.5 text-subhead text-label-2">{h.organizer}</span>}
+                  <StatusPill h={h} />
+                  <span className="flex h-6 items-center rounded-full bg-fill px-2.5 text-footnote font-semibold text-label-2">{source === "the web" ? "Web" : source}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <CalendarMenu h={h} size={48} />
+              <motion.a
+                href={h.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                whileTap={press}
+                transition={bouncy}
+                className="flex h-12 flex-col items-center justify-center rounded-full bg-accent px-6 text-on-accent hover:brightness-110"
+              >
+                <span className="flex items-center gap-1.5 text-callout font-semibold">
+                  {register}
+                  <Icon name="arrowUpRight" size={15} stroke={2.8} />
+                </span>
+                {days !== null && days >= 0 && <span className="text-caption font-medium opacity-85">{days === 0 ? "Closes today" : days === 1 ? "Closes tomorrow" : `Closes in ${days} days`}</span>}
+              </motion.a>
+            </div>
+          </motion.header>
+
+          <div className="mt-7 flex items-start gap-6">
+            {/* The shared sections bring their phone margins; the negative margin lines them up with the header. */}
+            <div className="-mx-4 min-w-0 flex-1">
+              <Facts h={h} detail={detail} className="mt-0 grid-cols-4" />
+              <About h={h} detail={detail} />
+              {detail && prizeItems(detail).length > 0 && <Prizes h={h} items={prizeItems(detail)} />}
+              <SourceLine h={h} />
+            </div>
+            <aside aria-label="Your progress" className="-mx-4 w-[392px] shrink-0">
+              <TrackCard h={h} className="mt-0" />
+              <Timeline h={h} />
+              <ClaudeCard detail={detail} />
+              <section className="card mx-4 mt-3 overflow-hidden rounded-[22px] [&>*:last-child_.row-line]:border-b-0">
+                {stage === "hidden" ? (
+                  <ActionRow icon="undo" label="Show in lists again" onClick={() => track(h, { status: null })} />
+                ) : (
+                  <ActionRow
+                    icon="eyeOff"
+                    label="Not interested"
+                    destructive
+                    onClick={() => {
+                      track(h, { status: "hidden" });
+                      toast("Hidden from your lists", "eye-off");
+                    }}
+                  />
+                )}
+              </section>
+            </aside>
+          </div>
+        </div>
+      </OverlayPage>
+    );
+  }
 
   return (
     <OverlayPage
@@ -140,26 +203,7 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
           </div>
         ) : undefined
       }
-      right={
-        <div className="glass flex h-11 rounded-full">
-          <motion.button type="button" aria-label="Share" onClick={share} whileTap={{ scale: 0.85 }} transition={bouncy} className="flex w-[46px] items-center justify-center text-label">
-            <Icon name="share" size={20} stroke={2.1} />
-          </motion.button>
-          <motion.button
-            type="button"
-            aria-label={saved ? "Remove from Saved" : "Save"}
-            aria-pressed={saved}
-            onClick={toggleSave}
-            whileTap={{ scale: 0.8 }}
-            transition={bouncy}
-            className={cn("flex w-[46px] items-center justify-center", saved ? "text-tint" : "text-label")}
-          >
-            <motion.span key={String(saved)} initial={{ scale: 0.5 }} animate={{ scale: 1 }} transition={bouncy}>
-              <Icon name="bookmark" size={19} stroke={2.1} filled={saved} />
-            </motion.span>
-          </motion.button>
-        </div>
-      }
+      right={<SaveShare saved={saved} onSave={toggleSave} onShare={share} />}
       bar={
         <div className="glass pointer-events-auto flex w-full max-w-[560px] items-center gap-2 rounded-full p-2">
           <CalendarMenu h={h} />
@@ -233,26 +277,166 @@ function Loaded({ h, detail }: { h: Hackathon; detail: HackathonDetail | null })
           )}
         </section>
 
-        <p className="mx-8 mt-5 text-center text-footnote text-label-2">
-          From {source} · checked {timeAgo(h.last_seen_at)}
-          {h.alt_urls.length > 0 && (
-            <>
-              <br />
-              Also listed on{" "}
-              {h.alt_urls.map((u, i) => (
-                <span key={u}>
-                  {i > 0 && ", "}
-                  <a href={u} target="_blank" rel="noopener noreferrer" className="font-medium text-tint">
-                    {hostOf(u)}
-                  </a>
-                </span>
-              ))}
-            </>
-          )}
-        </p>
+        <SourceLine h={h} />
       </div>
     </OverlayPage>
   );
+}
+
+function SaveShare({ saved, onSave, onShare }: { saved: boolean; onSave: () => void; onShare: () => void }) {
+  return (
+    <div className="glass flex h-11 rounded-full">
+      <motion.button type="button" aria-label="Share" onClick={onShare} whileTap={{ scale: 0.85 }} transition={bouncy} className="flex w-[46px] items-center justify-center text-label">
+        <Icon name="share" size={20} stroke={2.1} />
+      </motion.button>
+      <motion.button
+        type="button"
+        aria-label={saved ? "Remove from Saved" : "Save"}
+        aria-pressed={saved}
+        onClick={onSave}
+        whileTap={{ scale: 0.8 }}
+        transition={bouncy}
+        className={cn("flex w-[46px] items-center justify-center", saved ? "text-tint" : "text-label")}
+      >
+        <motion.span key={String(saved)} initial={{ scale: 0.5 }} animate={{ scale: 1 }} transition={bouncy}>
+          <Icon name="bookmark" size={19} stroke={2.1} filled={saved} />
+        </motion.span>
+      </motion.button>
+    </div>
+  );
+}
+
+function SourceLine({ h }: { h: Hackathon }) {
+  const source = sourceName(h);
+  return (
+    <p className="mx-8 mt-5 text-center text-footnote text-label-2">
+      From {source} · checked {timeAgo(h.last_seen_at)}
+      {h.alt_urls.length > 0 && (
+        <>
+          <br />
+          Also listed on{" "}
+          {h.alt_urls.map((u, i) => (
+            <span key={u}>
+              {i > 0 && ", "}
+              <a href={u} target="_blank" rel="noopener noreferrer" className="font-medium text-tint">
+                {hostOf(u)}
+              </a>
+            </span>
+          ))}
+        </>
+      )}
+    </p>
+  );
+}
+
+/** The event's dates in order, the next one marked. */
+function Timeline({ h }: { h: Hackathon }) {
+  const now = Date.now();
+  const events = [
+    { label: "Registration closes", at: h.registration_deadline },
+    { label: "Starts", at: h.start_date },
+    { label: "Ends", at: h.end_date },
+  ]
+    .filter((e): e is { label: string; at: string } => !!e.at && !Number.isNaN(Date.parse(e.at)))
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  if (!events.length) return null;
+  const next = events.findIndex((e) => Date.parse(e.at) >= now);
+  return (
+    <section className="card mx-4 mt-3 rounded-[22px] px-4 pt-4 pb-2">
+      <h2 className="text-headline font-semibold tracking-[-0.02em]">Timeline</h2>
+      <ol className="relative mt-2">
+        <span aria-hidden="true" className="absolute top-3 bottom-3 left-[4.5px] w-px bg-[var(--sep)]" />
+        {events.map((e, i) => {
+          const past = Date.parse(e.at) < now;
+          return (
+            <li key={e.label} className="relative flex items-start gap-3 py-2">
+              <span className={cn("relative mt-[5px] h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_0_3px_var(--card)]", i === next ? "bg-accent" : past ? "bg-label-3" : "bg-[var(--viz-muted)]")} />
+              <span className="min-w-0">
+                <span className={cn("block text-subhead font-medium", past && "text-label-2")}>{e.label}</span>
+                <span className="block text-footnote text-label-2">{weekdayDate(e.at)}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+/**
+ * A hackathon in Explore's side pane on a desktop: its art, the facts and your progress,
+ * with the full page one click away.
+ */
+export function Preview({ h }: { h: Hackathon }) {
+  const personal = usePersonal();
+  const stage = personal.items[h.id]?.status ?? null;
+  const saved = stage !== null && stage !== "hidden";
+  const source = sourceName(h);
+  return (
+    <div className="px-5 pt-5 pb-10">
+      <Cover h={h} iconSize={76} className="h-[184px] rounded-[18px]" />
+      <h2 className="mt-4 text-title2 leading-tight font-bold tracking-[-0.022em]">{h.title}</h2>
+      <p className="mt-1 text-subhead text-label-2">{[h.organizer, `on ${source === "the web" ? hostOf(h.source_url) : source}`].filter(Boolean).join(" · ")}</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <StatusPill h={h} />
+        {stage && stage !== "hidden" && <StageTag status={stage} className="h-6 rounded-full px-2.5 text-footnote" />}
+      </div>
+      <div className="mt-4 flex items-center gap-2">
+        <a
+          href={h.source_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-accent text-subhead font-semibold text-on-accent hover:brightness-110"
+        >
+          Register
+          <Icon name="arrowUpRight" size={14} stroke={2.8} />
+        </a>
+        <button
+          type="button"
+          aria-label={saved ? "Remove from Saved" : "Save"}
+          aria-pressed={saved}
+          onClick={() => {
+            track(h, { status: saved ? null : "saved" });
+            toast(saved ? "Removed from Saved" : "Saved", "bookmark");
+          }}
+          className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fill", saved ? "text-tint" : "text-label")}
+        >
+          <Icon name="bookmark" size={19} filled={saved} />
+        </button>
+        <CalendarMenu h={h} size={44} />
+        <button type="button" aria-label="Share" onClick={() => shareHackathon(h)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-fill text-label">
+          <Icon name="share" size={19} />
+        </button>
+      </div>
+      <div className="-mx-4">
+        <Facts h={h} detail={null} className="mt-4" />
+        {h.summary && <p className="mx-4 mt-4 text-[15px] leading-[1.5] text-label">{h.summary}</p>}
+        <TrackCard h={h} className="mt-4" />
+      </div>
+      <a
+        href={`/h/${h.id}`}
+        onClick={linkTo(`/h/${h.id}`)}
+        className="mt-5 flex h-11 items-center justify-center gap-1 rounded-[12px] bg-fill text-subhead font-semibold text-tint hover:bg-soft"
+      >
+        Open full page
+        <Icon name="chevron" size={13} stroke={2.8} />
+      </a>
+    </div>
+  );
+}
+
+/** The share sheet on a phone; on a computer, copy the link. */
+async function shareHackathon(h: Hackathon) {
+  const url = h.source_url;
+  if (window.matchMedia("(pointer: coarse)").matches && typeof navigator.share === "function") {
+    try {
+      await navigator.share({ title: h.title, text: `${h.title}\n${prizeShort(h)} prize pool\n\n${url}` });
+      return;
+    } catch (e) {
+      if ((e as DOMException).name === "AbortError") return;
+    }
+  }
+  if (await copyText(url)) toast("Link copied", "check");
 }
 
 function StatusPill({ h }: { h: Hackathon }) {
@@ -270,7 +454,7 @@ function StatusPill({ h }: { h: Hackathon }) {
  * and up to two lines of detail below. Half the width each (not a quarter), so a
  * non-cash prize note or a long place name wraps instead of crowding the row.
  */
-function Facts({ h, detail }: { h: Hackathon; detail: HackathonDetail | null }) {
+export function Facts({ h, detail, className }: { h: Hackathon; detail: HackathonDetail | null; className?: string }) {
   const days = daysLeft(h);
   const perks = detail?.prizes.some((p) => p.perks?.length);
   const place = h.location_text?.split(",").map((x) => x.trim()).filter(Boolean) ?? [];
@@ -310,7 +494,7 @@ function Facts({ h, detail }: { h: Hackathon; detail: HackathonDetail | null }) 
     },
   ];
   return (
-    <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ ...spring, delay: 0.05 }} aria-label="Key facts" className="mx-4 mt-5 grid grid-cols-2 gap-2.5">
+    <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ ...spring, delay: 0.05 }} aria-label="Key facts" className={cn("mx-4 mt-5 grid grid-cols-2 gap-2.5", className)}>
       {tiles.map((t) => (
         <div key={t.label} className="card flex min-w-0 flex-col rounded-[20px] px-3.5 pt-3 pb-3.5">
           <span className="flex items-center gap-1.5 text-footnote font-semibold text-label-2">
@@ -392,7 +576,7 @@ function NextStep({ stage, set }: { stage: Stage | null; set: (s: Stage) => void
  * line on where things stand, and one big button for the next step, so the
  * card reads at a glance on a phone instead of packing four tiles into a row.
  */
-function TrackCard({ h }: { h: Hackathon }) {
+export function TrackCard({ h, className }: { h: Hackathon; className?: string }) {
   const personal = usePersonal();
   const t = personal.items[h.id];
   const stage = t?.status ?? null;
@@ -421,7 +605,7 @@ function TrackCard({ h }: { h: Hackathon }) {
   const resultLabel = stage === "won" ? "Won" : stage === "not_placed" ? "Didn't place" : "Result";
 
   return (
-    <section className="card mx-4 mt-5 overflow-hidden rounded-[22px]">
+    <section className={cn("card mx-4 mt-5 overflow-hidden rounded-[22px]", className)}>
       <div className="p-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-headline font-semibold tracking-[-0.02em]">Your progress</h2>
@@ -640,10 +824,10 @@ function ActionRow({ icon, label, onClick, destructive }: { icon: IconName; labe
   );
 }
 
-function CalendarMenu({ h }: { h: Hackathon }) {
+function CalendarMenu({ h, size = 54 }: { h: Hackathon; size?: number }) {
   const events = useMemo(() => calendarEvents(h), [h]);
   if (!events.length) {
-    return <GlassButton label="No dates to add to a calendar yet" icon="calendarAdd" size={54} className="pointer-events-none opacity-50" />;
+    return <GlassButton label="No dates to add to a calendar yet" icon="calendarAdd" size={size} className="pointer-events-none opacity-50" />;
   }
   return (
     <Menu
@@ -658,8 +842,15 @@ function CalendarMenu({ h }: { h: Hackathon }) {
         }
       }}
       trigger={
-        <motion.button type="button" aria-label="Add to calendar" whileTap={{ scale: 0.88 }} transition={bouncy} className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full bg-fill text-label">
-          <Icon name="calendarAdd" size={22} />
+        <motion.button
+          type="button"
+          aria-label="Add to calendar"
+          whileTap={{ scale: 0.88 }}
+          transition={bouncy}
+          style={{ width: size, height: size }}
+          className="flex shrink-0 items-center justify-center rounded-full bg-fill text-label hover:bg-[color-mix(in_srgb,var(--fill)_100%,var(--label)_6%)]"
+        >
+          <Icon name="calendarAdd" size={size > 48 ? 22 : 20} />
         </motion.button>
       }
     />

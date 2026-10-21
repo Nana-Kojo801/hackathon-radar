@@ -137,7 +137,9 @@ A Postgres advisory lock stops two refreshes from running at once.
 
 ## Frontend
 
-An iPhone-style app, built phone first: large titles, grouped cards, a floating glass tab bar, swipe actions and sheets. On a laptop the same screens sit in a centred column.
+An iPhone-style app, built phone first: large titles, grouped cards, a floating glass tab bar, swipe actions and sheets.
+
+**On a computer** (windows 1024px and wider) it has a desktop layout instead: a sidebar in place of the tab bar, with search (Ctrl K or ⌘ K, or `/`), Stats, and shortcuts that open Explore with a filter set (closing this week, new since your last visit, $50K+ prizes, online). Today puts the new arrivals and this week's deadlines beside a column with the counts, your deadlines and the biggest prize. Explore has a filter bar and, from 1200px, a preview of the selected hackathon beside the list (↑ and ↓ move through it, Enter opens the page). Saved is a board with a column per stage: drag a card to move it on. A hackathon's page puts the facts and description on the left and your progress, timeline and Claude on the right. Settings opens its pages beside the list, and Stats uses two columns. Escape closes a page.
 
 - **Today (`/`):** what needs you. Counts for closing this week / new since your last visit / open, countdown cards for the hackathons you saved, the biggest prize closing this week, the rest of this week's deadlines and the new arrivals. Each count opens Explore with that filter.
 - **Explore (`/explore`):** search, removable filter chips with quick suggestions, a sort menu, and a filter sheet (sort, closes within, format, minimum prize, worldwide, student-only, new only, categories, platforms). The list loads more as you scroll. Swipe a row left for **Save** and **Hide**.

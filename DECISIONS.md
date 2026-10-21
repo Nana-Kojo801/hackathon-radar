@@ -177,3 +177,13 @@ A small static FX table (`normalize.FX_TO_USD`) converts INR/EUR/CAD/etc. right 
 - Requests that fail carry the HTTP status, and `lib/errors.ts` turns a failure into one plain sentence: a 404 means the server is running an older version (it answers, but doesn't have the route), 401 a rejected key, 5xx an error on the server, and push-subscription errors get their own wording. Before this, turning on notifications said "couldn't reach the server" for everything, which sent us looking at the wrong thing when Render simply hadn't deployed the push routes.
 - `GET /health` reports the commit the server is running (`RENDER_GIT_COMMIT`) and whether push is configured, so a deploy can be checked from the browser.
 
+
+## Desktop layout
+
+- **One app, two layouts.** From 1024px wide (`desk:` in CSS, `useDesktop()` in `lib/desktop.ts`) the app swaps the tab bar for a sidebar and gives each page a desktop arrangement; below that it's the phone app unchanged (a tablet in portrait still gets the phone layout in a centred column). Pages decide their own desktop layout and reuse the phone pieces, so a fix to a card shows up in both.
+- **Sidebar, not tabs.** Today, Explore, Saved and Stats, search, and shortcuts that set Explore's filters (with live counts), with Settings and the sync status at the bottom. Switching pages is instant: the sideways tab slide is a phone gesture.
+- **Pages still push in from the right,** but beside the sidebar, which stays put, and without the page underneath drifting (it would slide under the sidebar). Escape goes back.
+- **Explore is a list with a preview pane** (from 1200px, where both fit): one click shows a hackathon beside the list, a double click or Enter opens its page, the arrow keys move through the list. Filters are a row of menus and toggles instead of the sheet, which stays for categories and platforms.
+- **Saved is a board** with a column per stage (Saved, Registered, Submitted, Results). Moving a hackathon on is one drag; the Results column splits into Won and Didn't place while you drag. Hidden hackathons are one button away.
+- **Settings opens its pages beside the list** (Appearance by default) rather than pushing them over it: the same pages, rendered without their own back bar (`InlinePage` in `components/OverlayPage.tsx`).
+- **A hackathon's page** has its banner as a rounded card across the top, the register button in the header instead of a floating bar, the facts in a row of four, and a right column with your progress, a timeline of its dates, Claude and Not interested.

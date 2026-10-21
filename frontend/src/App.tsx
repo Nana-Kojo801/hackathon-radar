@@ -2,15 +2,17 @@ import { MotionConfig } from "framer-motion";
 import { lazy, type PointerEvent, type ReactNode, type RefObject, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { TabActiveContext, ToastView } from "./components/kit";
+import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
 import { fetchData, fetchJSON, type Hackathon, type Meta } from "./lib/api";
 import { appearance, useAppearance } from "./lib/appearance";
 import { DEFAULT_FILTERS, type Filters, lastVisit, loadFilters, saveFilters } from "./lib/filters";
+import { isDesktop, useDesktop } from "./lib/desktop";
 import { daysLeft } from "./lib/format";
 import { healthWarning } from "./lib/health";
 import { sync, usePersonal } from "./lib/personal";
 import { setBadge } from "./lib/push";
-import { goBack, type Overlay, parse, TAB_PATH, type Tab, usePath } from "./lib/router";
+import { goBack, type Overlay, parse, type Route, TAB_PATH, type Tab, usePath } from "./lib/router";
 import { flush as flushActivity, startActivityLog } from "./lib/stats";
 import { currentOffset, fade, reducedMotion, slide } from "./lib/transition";
 import { cn } from "./lib/utils";
@@ -46,9 +48,17 @@ if (window.location.pathname === "/" && appearance().startTab !== "today") {
   window.history.replaceState(null, "", TAB_PATH[appearance().startTab]);
 }
 
+/** Settings pages that open beside the settings list on a desktop, instead of over it. */
+export const SETTINGS_PANES: Overlay["kind"][] = ["appearance", "notifications", "email"];
+
 export default function App() {
   const path = usePath();
-  const route = useMemo(() => parse(path), [path]);
+  const desktop = useDesktop();
+  const parsed = useMemo(() => parse(path), [path]);
+  const route: Route = useMemo(
+    () => (desktop && parsed.overlay && SETTINGS_PANES.includes(parsed.overlay.kind) ? { ...parsed, overlay: null, key: null } : parsed),
+    [parsed, desktop],
+  );
   const personal = usePersonal();
   const look = useAppearance();
 
@@ -168,7 +178,7 @@ export default function App() {
   // tab being left stays visible ("leaving") until its slide ends.
   const mains = useRef<Partial<Record<Tab, HTMLElement | null>>>({});
   const [tabs, setTabs] = useState<{ current: Tab; leaving: Tab | null }>({ current: route.tab, leaving: null });
-  if (tabs.current !== route.tab) setTabs({ current: route.tab, leaving: route.overlay || reducedMotion() ? null : tabs.current });
+  if (tabs.current !== route.tab) setTabs({ current: route.tab, leaving: route.overlay || reducedMotion() || desktop ? null : tabs.current });
   const endSlide = useRef<((finished?: boolean) => void) | null>(null);
 
   useLayoutEffect(() => {
@@ -281,7 +291,8 @@ export default function App() {
       <MotionConfig reducedMotion="user">
         {/* overflow-x: clip, so a tab sliding in from the right can't make the page wider than the
             screen; Safari then shifted its fixed layer, and the tab bar with it. */}
-        <div ref={under} className="relative min-h-dvh overflow-x-clip">
+        <Sidebar route={parsed} badge={closingSaved} />
+        <div ref={under} className="relative min-h-dvh overflow-x-clip desk:pl-[260px]">
           {TAB_ORDER.filter((t) => visited.has(t)).map((t) => (
             <main
               key={t}
@@ -289,13 +300,13 @@ export default function App() {
                 mains.current[t] = el;
               }}
               hidden={t !== route.tab && t !== tabs.leaving}
-              className="mx-auto max-w-[720px]"
+              className="mx-auto max-w-[720px] desk:max-w-none"
             >
               <TabActiveContext.Provider value={t === route.tab}>{TAB_PAGES[t]}</TabActiveContext.Provider>
             </main>
           ))}
         </div>
-        <div ref={dim} aria-hidden="true" style={{ opacity: 0, background: "var(--scrim)" }} className="pointer-events-none fixed inset-0 z-40" />
+        <div ref={dim} aria-hidden="true" style={{ opacity: 0, background: "var(--scrim)" }} className="pointer-events-none fixed inset-0 z-40 desk:left-[260px]" />
         <TabBar active={route.tab} hidden={!!route.overlay} badge={closingSaved} onReselect={onReselect} />
         {layers.map((l) => (
           <OverlayLayer key={l.key} id={l.key} leaving={l.leaving} under={under} dim={dim} onGone={gone}>
@@ -331,7 +342,8 @@ function OverlayLayer({
 }) {
   const el = useRef<HTMLDivElement>(null);
   const width = () => window.innerWidth;
-  const PARALLAX = 0.22;
+  // The page underneath drifts left as on iOS; not on a desktop, where it would slide under the sidebar.
+  const PARALLAX = isDesktop() ? 0 : 0.22;
 
   /** Place the page underneath and the dim layer to match the overlay at `x`. */
   const follow = (x: number, from: number | null, done?: () => void) => {
@@ -361,6 +373,18 @@ function OverlayLayer({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Escape goes back, as on a desktop (a menu or sheet open on top closes first).
+  useEffect(() => {
+    if (leaving) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[role="dialog"], [data-radix-popper-content-wrapper]')) return;
+      const top = [...document.querySelectorAll("[data-overlay]:not([data-leaving])")].pop();
+      if (top === el.current) goBack();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [leaving]);
 
   useLayoutEffect(() => {
     if (!leaving || !el.current) return;
@@ -406,7 +430,7 @@ function OverlayLayer({
       data-overlay=""
       data-leaving={leaving ? "" : undefined}
       style={{ transform: `translate3d(${width()}px,0,0)`, willChange: "transform" }}
-      className={cn("page-bg fixed inset-0 z-50 overflow-hidden shadow-[-12px_0_40px_rgba(0,0,0,0.18)]", leaving && "pointer-events-none")}
+      className={cn("page-bg fixed inset-0 z-50 overflow-hidden shadow-[-12px_0_40px_rgba(0,0,0,0.18)] desk:left-[260px]", leaving && "pointer-events-none")}
     >
       {children}
       <div aria-hidden="true" className="absolute inset-y-0 left-0 z-40 w-5 touch-none" onPointerDown={onEdge} />

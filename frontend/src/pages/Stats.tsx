@@ -24,7 +24,7 @@ export function StatsPage() {
   const market = useMarketStats();
 
   return (
-    <OverlayPage title="Stats" backLabel="Settings" backTo="/settings">
+    <OverlayPage title="Stats" backLabel="Settings" backTo="/settings" wide>
       <div className="pb-24">
         <h1 className="mx-5 mt-1 text-large font-bold tracking-[-0.028em]">Stats</h1>
         <p className="mx-5 mt-1 text-subhead text-label-2">{view === "you" ? "How you find, enter and win hackathons." : "What's out there right now, and how the radar is doing."}</p>
@@ -39,10 +39,11 @@ export function StatsPage() {
             { value: "you", label: "You" },
             { value: "market", label: "Market" },
           ]}
-          className="mx-4 mt-4"
+          className="mx-4 mt-4 desk:max-w-[320px]"
         />
-        {/* Keyed, so the other view slides in (.swap-in in index.css). */}
-        <div key={view} className={switched ? "swap-in" : undefined}>
+        {/* Keyed, so the other view slides in (.swap-in in index.css). Two columns on a desktop:
+            the hero, headings and tile rows run across both. */}
+        <div key={view} className={cn("desk:grid desk:grid-cols-2 desk:items-start", switched && "swap-in")}>
             {view === "you" ? (
               !p.key ? (
                 <ConnectPrompt />
@@ -75,7 +76,7 @@ function Card({ title, sub, children, className }: { title?: string; sub?: React
 }
 
 function Heading({ children }: { children: ReactNode }) {
-  return <h2 className="mx-5 mt-8 mb-0.5 text-title3 font-bold tracking-[-0.022em]">{children}</h2>;
+  return <h2 className="mx-5 mt-8 mb-0.5 text-title3 font-bold tracking-[-0.022em] desk:col-span-2">{children}</h2>;
 }
 
 function Tile({ icon, tone = "text-tint", value, label }: { icon: IconName; tone?: string; value: ReactNode; label: ReactNode }) {
@@ -90,7 +91,7 @@ function Tile({ icon, tone = "text-tint", value, label }: { icon: IconName; tone
 
 function Hero({ eyebrow, lead, figure, line, pills }: { eyebrow: string; lead: string; figure: string; line: ReactNode; pills: string[] }) {
   return (
-    <div className="mx-4 mt-4 overflow-hidden rounded-[24px] p-5 text-on-accent" style={{ background: "linear-gradient(140deg, var(--accent-hi) 0%, var(--accent) 72%)" }}>
+    <div className="mx-4 mt-4 overflow-hidden rounded-[24px] p-5 text-on-accent desk:col-span-2" style={{ background: "linear-gradient(140deg, var(--accent-hi) 0%, var(--accent) 72%)" }}>
       <div className="text-footnote font-semibold tracking-[0.03em] uppercase opacity-80">{eyebrow}</div>
       <div className="mt-2 text-callout font-medium opacity-90">{lead}</div>
       <div className="text-[56px] leading-[1.05] font-bold tracking-[-0.04em]">{figure}</div>
@@ -113,7 +114,7 @@ function Empty({ children }: { children: ReactNode }) {
 function Loading({ error, retry }: { error: string | null; retry: () => void }) {
   if (error)
     return (
-      <Card className="mt-4">
+      <Card className="mt-4 desk:col-span-2">
         <p className="text-subhead text-label-2">{error}</p>
         <PrimaryButton onClick={retry} className="mt-3 h-10 w-full text-subhead">
           Try again
@@ -121,7 +122,7 @@ function Loading({ error, retry }: { error: string | null; retry: () => void }) 
       </Card>
     );
   return (
-    <div className="mt-4 space-y-3 px-4" aria-busy="true">
+    <div className="mt-4 space-y-3 px-4 desk:col-span-2" aria-busy="true">
       {[180, 120, 220].map((h, i) => (
         <div key={i} className="animate-pulse rounded-[22px] bg-fill" style={{ height: h }} />
       ))}
@@ -131,7 +132,7 @@ function Loading({ error, retry }: { error: string | null; retry: () => void }) 
 
 function ConnectPrompt() {
   return (
-    <Card className="mt-4">
+    <Card className="mt-4 desk:col-span-2">
       <div className="flex items-start gap-3.5">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px] bg-soft text-tint">
           <Icon name="key" size={22} />
@@ -196,7 +197,7 @@ function You({ s }: { s: MyStats }) {
       />
 
       <Heading>This week</Heading>
-      <div className="mx-4 mt-2.5 grid grid-cols-2 gap-3">
+      <div className="mx-4 mt-2.5 grid grid-cols-2 gap-3 desk:col-span-2 desk:grid-cols-4">
         <Tile icon="home" value={s.recap.opens} label="times you opened the app" />
         <Tile icon="eye" value={s.recap.views} label="hackathons you looked at" />
         <Tile icon="bookmark" tone="text-orange" value={s.recap.saved} label="saved" />
@@ -246,7 +247,7 @@ function You({ s }: { s: MyStats }) {
       </Card>
 
       <Heading>How you use the app</Heading>
-      <div className="mx-4 mt-2.5 grid grid-cols-3 gap-3">
+      <div className="mx-4 mt-2.5 grid grid-cols-3 gap-3 desk:col-span-2">
         <Tile icon="flame" tone="text-orange" value={a.streak} label={`day streak`} />
         <Tile icon="trophy" tone="text-tint" value={a.longest_streak} label="longest streak" />
         <Tile icon="calendar" tone="text-green" value={a.active_days_30} label="active days of 30" />
@@ -257,12 +258,15 @@ function You({ s }: { s: MyStats }) {
             <Columns data={a.per_week.map((w) => ({ label: weekLabel(w.week), values: [w.count] }))} tip={(i) => `Week of ${weekLabel(a.per_week[i].week)}`} />
           </Card>
           <Card title="When you check" sub={busiest?.v ? `Most often ${WEEKDAYS[busiest.r]}s, ${BLOCK_RANGE[busiest.c]} (${s.timezone.replace("_", " ")}).` : "Last 90 days."}>
-            <HeatGrid
-              grid={a.heatmap}
-              rows={WEEKDAYS.map((d) => d.slice(0, 2))}
-              cols={BLOCKS}
-              describe={(r, c, v) => `${WEEKDAYS[r]}, ${BLOCK_RANGE[c]}: ${v} open${v === 1 ? "" : "s"}`}
-            />
+            {/* Its cells are square, so on a wide card it's kept to a phone's width. */}
+            <div className="desk:mx-auto desk:max-w-[400px]">
+              <HeatGrid
+                grid={a.heatmap}
+                rows={WEEKDAYS.map((d) => d.slice(0, 2))}
+                cols={BLOCKS}
+                describe={(r, c, v) => `${WEEKDAYS[r]}, ${BLOCK_RANGE[c]}: ${v} open${v === 1 ? "" : "s"}`}
+              />
+            </div>
           </Card>
           <Card title="How you get here" sub={topSource?.n ? `${topSource.label === "Email" ? "Emails bring" : topSource.label === "Notification" ? "Notifications bring" : `The ${topSource.label} brings`} you back most often.` : undefined}>
             <StackBar parts={SOURCES.map((x) => ({ label: x.label, value: a.sources[x.key], color: x.color }))} />
@@ -275,7 +279,7 @@ function You({ s }: { s: MyStats }) {
       )}
 
       <Heading>Habits</Heading>
-      <div className="mx-4 mt-2.5 grid grid-cols-3 gap-3">
+      <div className="mx-4 mt-2.5 grid grid-cols-3 gap-3 desk:col-span-2">
         <Tile icon="clock" value={days(s.habits.save_to_register_days)} label="from saving to registering" />
         <Tile icon="calendar" tone="text-green" value={days(s.habits.lead_days)} label="before the deadline you register" />
         <Tile icon="alert" tone="text-orange" value={pct(s.habits.last_minute_pct)} label="registered in the last 48 h" />
@@ -421,10 +425,12 @@ function Market({ s }: { s: MarketStats }) {
         )}
       </Card>
       <Card title="Deadlines ahead" sub={busiestDay ? `Busiest day: ${new Date(busiestDay[0] + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, with ${busiestDay[1]} closing.` : "Registration deadlines over the next 8 weeks."}>
-        <CalendarHeat
-          counts={s.closing}
-          describe={(d, v) => `${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}: ${v} closing`}
-        />
+        <div className="desk:mx-auto desk:max-w-[400px]">
+          <CalendarHeat
+            counts={s.closing}
+            describe={(d, v) => `${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}: ${v} closing`}
+          />
+        </div>
       </Card>
 
       <Heading>What's on offer</Heading>
@@ -439,7 +445,7 @@ function Market({ s }: { s: MarketStats }) {
       </Card>
 
       <Heading>Radar health</Heading>
-      <div className="mx-4 mt-2.5 grid grid-cols-3 gap-3">
+      <div className="mx-4 mt-2.5 grid grid-cols-3 gap-3 desk:col-span-2">
         <Tile icon="refresh" value={runs.runs} label="refreshes in 14 days" />
         <Tile icon={runs.errors ? "alert" : "check"} tone={runs.errors ? "text-orange" : "text-green"} value={runs.errors} label="source errors" />
         <Tile icon="sparkle" value={compact(runs.tokens)} label="AI tokens used" />
