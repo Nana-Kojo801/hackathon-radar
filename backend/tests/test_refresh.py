@@ -102,10 +102,8 @@ def test_status_follows_the_pipeline(client):
     assert [(r["source"], r["fetched"], r["new"]) for r in s["sources"]] == [("devpost", 12, 3)]
 
 
-def test_tick_starts_the_due_run_once(client, monkeypatch):
+def test_tick_starts_the_due_run_once(client):
     from datetime import datetime, timezone
-
-    from app import refresh
 
     # The last run was long before the latest slot: start one.
     client.fake.runs["refresh.yml"] = [gh_run("completed", "success", created="2000-01-01T00:00:00Z")]
